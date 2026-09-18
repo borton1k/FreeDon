@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FreeDon Upgrader</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*{font-family:'Inter',sans-serif;box-sizing:border-box}
+html,body{background:#070a12;color:#fff;margin:0;padding:0}
+body{background:radial-gradient(circle at 20% 0%,rgba(59,130,246,0.15),transparent 40%),radial-gradient(circle at 80% 100%,rgba(239,68,68,0.12),transparent 45%),#070a12;min-height:100vh}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(59,130,246,0.4);border-radius:4px}
+.glass{background:rgba(20,25,38,0.7);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.06)}
+.glass-strong{background:rgba(20,25,38,0.92);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08)}
+.item-card{position:relative;background:linear-gradient(160deg,rgba(30,38,55,0.9),rgba(20,26,40,0.9));border:1px solid rgba(255,255,255,0.05);border-radius:14px;transition:all 0.25s;overflow:hidden}
+.item-card:hover{transform:translateY(-4px);border-color:rgba(59,130,246,0.5);box-shadow:0 12px 30px rgba(59,130,246,0.15)}
+.item-selected{box-shadow:0 0 0 2px #3b82f6,0 12px 30px rgba(59,130,246,0.4)!important;border-color:#3b82f6!important}
+.wheel{position:relative;border-radius:50%;background:conic-gradient(#ef4444 0%,#ef4444 var(--chance),rgba(42,46,57,0.6) var(--chance),rgba(42,46,57,0.6) 100%);display:flex;align-items:center;justify-content:center;transition:background 0.5s ease;box-shadow:0 0 40px rgba(239,68,68,0.3),inset 0 0 30px rgba(0,0,0,0.5)}
+.wheel-inner{background:radial-gradient(circle,#0d1220,#070a12);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:10;box-shadow:inset 0 0 20px rgba(0,0,0,0.8)}
+.btn-primary{background:linear-gradient(135deg,#3b82f6,#2563eb);transition:all 0.2s;box-shadow:0 4px 14px rgba(59,130,246,0.3)}
+.btn-primary:hover:not(:disabled){background:linear-gradient(135deg,#2563eb,#1d4ed8);box-shadow:0 6px 20px rgba(59,130,246,0.5);transform:translateY(-1px)}
+.btn-primary:disabled{opacity:0.4;cursor:not-allowed}
+.btn-success{background:linear-gradient(135deg,#10b981,#059669);transition:all 0.2s;box-shadow:0 4px 14px rgba(16,185,129,0.3)}
+.btn-success:hover:not(:disabled){background:linear-gradient(135deg,#059669,#047857);transform:translateY(-1px)}
+.btn-success:disabled{opacity:0.4;cursor:not-allowed}
+.tab-btn{position:relative;padding:8px 4px;font-weight:600;font-size:14px;color:#6b7280;transition:color 0.2s;border:none;background:none;cursor:pointer}
+.tab-btn:hover{color:#9ca3af}
+.tab-btn.active{color:#fff}
+.tab-btn.active::after{content:'';position:absolute;bottom:-4px;left:0;right:0;height:2px;background:linear-gradient(90deg,#3b82f6,#8b5cf6);border-radius:2px}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideInRight{from{opacity:0;transform:translateX(100px)}to{opacity:1;transform:translateX(0)}}
+@keyframes spinWheel{from{transform:rotate(0deg)}to{transform:rotate(1440deg)}}
+.animate-fade-in{animation:fadeIn 0.2s ease-out}
+.animate-slide-up{animation:slideUp 0.3s}
+.animate-slide-in{animation:slideInRight 0.4s}
+.spinning-wheel{animation:spinWheel 2s cubic-bezier(0.15,0.9,0.3,1) forwards}
+.notification{background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 8px 30px rgba(16,185,129,0.4)}
+.modal-content{background:rgba(20,25,38,0.97);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08)}
+.profile-stat{background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.05);border-radius:14px;padding:16px}
+.profile-avatar{width:88px;height:88px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:900;color:#fff;box-shadow:0 8px 30px rgba(139,92,246,0.4);margin:0 auto 16px}
+.user-chip{display:flex;align-items:center;gap:8px;padding:4px 10px 4px 4px;border-radius:999px;cursor:pointer;border:1px solid transparent;background:transparent}
+.user-chip:hover{background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1)}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect}=React;
+const API="";
+const ADMINS=["akaidzu"];
+const ITEMS=[
+{id:1,name:"Тотем Бессмертия",price:3,color:"#9ca3af"},
+{id:2,name:"Сет Алмазной Брони З4",price:4,color:"#9ca3af"},
+{id:3,name:"Зелье Черепашей Мощи",price:5,color:"#9ca3af"},
+{id:4,name:"Зачарованное Золотое Яблоко",price:8,color:"#22c55e"},
+{id:5,name:"Шар Порядка",price:10,color:"#22c55e"},
+{id:6,name:"Алый Лотос",price:12,color:"#22c55e"},
+{id:7,name:"Шар Дыни (на урон)",price:15,color:"#3b82f6"},
+{id:8,name:"Зимнее Зелье",price:20,color:"#3b82f6"},
+{id:9,name:"Слово Дыни, Сок На Асфальте",price:25,color:"#a855f7"},
+{id:10,name:"Ломтик Дыни",price:35,color:"#a855f7"},
+{id:11,name:"Талисман Sponsor",price:50,color:"#ef4444"}
+];
+
+async function api(path,body){
+const res=await fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})});
+const data=await res.json().catch(()=>({error:'Сервер не отвечает'}));
+if(!res.ok)throw new Error(data.error||'Ошибка');
+return data;
+}
+
+const Icon=({name,className="w-5 h-5"})=>{
+const icons={
+coin:<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1.99.86 1.57 2.18 1.57 1.24 0 1.94-.55 1.94-1.38 0-.77-.51-1.24-2.42-1.79-2.13-.62-3.15-1.48-3.15-3.03 0-1.65 1.29-2.76 2.76-3.07V5h2.67v1.96c1.63.36 2.75 1.42 2.86 3.07h-1.99c-.08-.85-.7-1.45-1.97-1.45-1.17 0-1.83.5-1.83 1.28 0 .73.53 1.16 2.43 1.71 2.13.62 3.12 1.5 3.12 3.09 0 1.79-1.36 2.85-2.63 3.13z"/>,
+inventory:<path d="M20 2H4c-1.1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1.1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/>,
+history:<path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>,
+shop:<path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/>,
+upgrade:<path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6h-6z"/>,
+admin:<path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/>,
+logout:<path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/>,
+close:<path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>,
+check:<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>,
+warn:<path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>,
+money:<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1.99.86 1.57 2.18 1.57 1.24 0 1.94-.55 1.94-1.38 0-.77-.51-1.24-2.42-1.79-2.13-.62-3.15-1.48-3.15-3.03 0-1.65 1.29-2.76 2.76-3.07V5h2.67v1.96c1.63.36 2.75 1.42 2.86 3.07h-1.99c-.08-.85-.7-1.45-1.97-1.45-1.17 0-1.83.5-1.83 1.28 0 .73.53 1.16 2.43 1.71 2.13.62 3.12 1.5 3.12 3.09 0 1.79-1.36 2.85-2.63 3.13z"/>
+};
+return <svg className={className} viewBox="0 0 24 24" fill="currentColor">{icons[name]}</svg>;
+};
+
+const AuthScreen=({onAuth})=>{
+const [mode,setMode]=useState("check");
+const [username,setUsername]=useState("");
+const [password,setPassword]=useState("");
+const [confirm,setConfirm]=useState("");
+const [error,setError]=useState("");
+const [loading,setLoading]=useState(false);
+
+const handleCheck=(e)=>{
+e.preventDefault();
+setError("");
+const clean=username.trim();
+if(clean.length<3)return setError("Ник минимум 3 символа");
+if(clean.length>16)return setError("Ник максимум 16 символов");
+if(!/^[a-zA-Z0-9_]+$/.test(clean))return setError("Только латиница, цифры и _");
+setMode("login");
+};
+
+const handleLogin=async(e)=>{
+e.preventDefault();
+setError("");
+setLoading(true);
+try{
+const data=await api("/api/login",{username:username.trim(),password});
+setLoading(false);
+onAuth(username.trim(),password,data.user);
+}catch(err){
+setLoading(false);
+setError(err.message);
+}
+};
+
+const handleRegister=async(e)=>{
+e.preventDefault();
+setError("");
+if(password.length<4)return setError("Пароль минимум 4 символа");
+if(password!==confirm)return setError("Пароли не совпадают");
+setLoading(true);
+try{
+await api("/api/register",{username:username.trim(),password});
+const data=await api("/api/login",{username:username.trim(),password});
+setLoading(false);
+onAuth(username.trim(),password,data.user);
+}catch(err){
+setLoading(false);
+setError(err.message);
+}
+};
+
+return (
+<div className="min-h-screen flex items-center justify-center p-4">
+<div className="glass-strong rounded-3xl p-10 w-full max-w-md shadow-2xl animate-slide-up">
+<div className="text-center mb-8">
+<div className="inline-flex items-center gap-2 mb-2 flex-wrap justify-center">
+<span className="text-3xl font-black bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">FreeDon</span>
+<span className="text-3xl font-black text-white">Upgrader</span>
+</div>
+<p className="text-gray-500 text-sm">Апгрейдер предметов</p>
+</div>
+
+{mode==="check"&&(
+<form onSubmit={handleCheck} className="space-y-5">
+<div>
+<h2 className="text-white font-bold text-xl mb-1">Вход</h2>
+<p className="text-gray-500 text-sm mb-5">Введите ник. Если аккаунта нет — создадим новый.</p>
+</div>
+<div>
+<label className="text-gray-400 text-xs font-semibold uppercase tracking-wider block mb-2">Ваш ник</label>
+<input type="text" value={username} onChange={(e)=>setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g,''))} className="w-full bg-black/40 border border-white/10 focus:border-blue-500 text-white px-4 py-3 rounded-xl outline-none text-center font-bold text-lg" placeholder="PvpPro67" maxLength={16} autoFocus />
+<p className="text-gray-600 text-xs mt-2 text-center">3–16 символов, латиница, цифры, _</p>
+</div>
+{error&&<div className="text-red-400 text-sm text-center bg-red-500/10 border border-red-500/20 p-3 rounded-xl">{error}</div>}
+<button type="submit" className="btn-primary w-full text-white font-bold py-3 rounded-xl">Продолжить</button>
+</form>
+)}
+
+{mode==="login"&&(
+<form onSubmit={handleLogin} className="space-y-5">
+<div>
+<h2 className="text-white font-bold text-xl mb-1">Вход</h2>
+<p className="text-gray-500 text-sm mb-5">Пароль для <span className="text-blue-400 font-bold">{username}</span></p>
+</div>
+<div>
+<label className="text-gray-400 text-xs font-semibold uppercase tracking-wider block mb-2">Пароль</label>
+<input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} className="w-full bg-black/40 border border-white/10 focus:border-blue-500 text-white px-4 py-3 rounded-xl outline-none text-center font-bold" placeholder="••••••••" autoFocus />
+</div>
+{error&&<div className="text-red-400 text-sm text-center bg-red-500/10 border border-red-500/20 p-3 rounded-xl">{error}</div>}
+<button type="submit" disabled={loading} className="btn-primary w-full text-white font-bold py-3 rounded-xl">{loading?'Проверка...':'Войти'}</button>
+<button type="button" onClick={()=>{setMode("register");setError("");setPassword("");}} className="w-full text-gray-500 hover:text-white text-sm">Нет аккаунта? Зарегистрироваться →</button>
+<button type="button" onClick={()=>{setMode("check");setError("");setPassword("");}} className="w-full text-gray-500 hover:text-white text-sm">← Сменить ник</button>
+</form>
+)}
+
+{mode==="register"&&(
+<form onSubmit={handleRegister} className="space-y-5">
+<div>
+<h2 className="text-white font-bold text-xl mb-1">Регистрация</h2>
+<p className="text-gray-500 text-sm mb-5">Новый аккаунт: <span className="text-blue-400 font-bold">{username}</span></p>
+</div>
+<div>
+<label className="text-gray-400 text-xs font-semibold uppercase tracking-wider block mb-2">Пароль</label>
+<input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} className="w-full bg-black/40 border border-white/10 focus:border-blue-500 text-white px-4 py-3 rounded-xl outline-none" placeholder="Минимум 4 символа" autoFocus />
+</div>
+<div>
+<label className="text-gray-400 text-xs font-semibold uppercase tracking-wider block mb-2">Повторите пароль</label>
+<input type="password" value={confirm} onChange={(e)=>setConfirm(e.target.value)} className="w-full bg-black/40 border border-white/10 focus:border-blue-500 text-white px-4 py-3 rounded-xl outline-none" placeholder="Ещё раз" />
+</div>
+{error&&<div className="text-red-400 text-sm text-center bg-red-500/10 border border-red-500/20 p-3 rounded-xl">{error}</div>}
+<button type="submit" disabled={loading} className="btn-success w-full text-white font-bold py-3 rounded-xl">{loading?'Создание...':'Создать аккаунт'}</button>
+<button type="button" onClick={()=>{setMode("login");setError("");setPassword("");setConfirm("");}} className="w-full text-gray-500 hover:text-white text-sm">← Уже есть аккаунт? Войти</button>
+</form>
+)}
+</div>
+</div>
+);
+};
+
+const ItemCard=({item,isSelected,onClick})=>(
+<div onClick={onClick} className={`item-card p-3 cursor-pointer flex flex-col justify-between h-32 ${isSelected?'item-selected':''}`}>
+<div className="flex-1 flex items-center justify-center text-center px-1">
+<span className="text-xs text-white font-semibold leading-tight">{item.name}</span>
+</div>
+<div className="flex items-center justify-center gap-1 text-yellow-500 font-bold text-xs mt-2">
+<Icon name="coin" className="w-3 h-3"/>
+<span>{item.price}</span>
+</div>
+<div className="absolute bottom-0 left-0 w-full h-1" style={{backgroundColor:item.color}}></div>
+</div>
+);
+
+const InventoryItem=({item,onWithdraw})=>(
+<div className="item-card p-3 flex flex-col justify-between">
+<div className="flex items-center justify-center text-center px-1 py-2 min-h-[50px]">
+<span className="text-xs text-white font-semibold leading-tight">{item.name}</span>
+</div>
+<div className="text-[9px] text-gray-500 text-center font-mono tracking-wider">ID: {item.ticketId||"—"}</div>
+<div className="flex items-center justify-center gap-1 text-yellow-500 font-bold text-xs my-1">
+<Icon name="coin" className="w-3 h-3"/>
+<span>{item.price}</span>
+</div>
+<button onClick={()=>onWithdraw(item)} className="btn-success w-full text-white text-xs font-bold py-1.5 rounded-lg">Вывести</button>
+<div className="absolute bottom-0 left-0 w-full h-1" style={{backgroundColor:item.color}}></div>
+</div>
+);
+
+const ProfileModal=({user,data,onClose})=>{
+const history=data.history||[];
+const wins=history.filter(h=>h.win).length;
+const losses=history.filter(h=>!h.win).length;
+const total=wins+losses;
+const winRate=total>0?((wins/total)*100).toFixed(1):"0.0";
+const inv=data.inventory||[];
+const balance=typeof data.balance==="number"?data.balance:0;
+const created=data.createdAt?new Date(data.createdAt):null;
+const createdStr=created?created.toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):"Неизвестно";
+const days=created?Math.floor((Date.now()-created.getTime())/86400000):0;
+
+return (
+<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-fade-in" onClick={onClose}>
+<div className="modal-content rounded-3xl p-8 max-w-2xl w-full shadow-2xl animate-slide-up max-h-[90vh] overflow-y-auto" onClick={(e)=>e.stopPropagation()}>
+<div className="flex justify-between items-start mb-6">
+<h2 className="text-white font-bold text-2xl">Профиль</h2>
+<button onClick={onClose} className="text-gray-500 hover:text-white"><Icon name="close"/></button>
+</div>
+<div className="text-center mb-8">
+<div className="profile-avatar">{user[0].toUpperCase()}</div>
+<h3 className="text-white font-black text-2xl mb-1">{user}</h3>
+<p className="text-gray-500 text-sm">Зарегистрирован: {createdStr}</p>
+{created&&<p className="text-gray-600 text-xs mt-1">{days===0?"Сегодня в игре":`В игре ${days} ${days===1?"день":days<5?"дня":"дней"}`}</p>}
+</div>
+<div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+<div className="profile-stat text-center"><div className="text-gray-500 text-xs uppercase tracking-wider mb-1">Монет</div><div className="text-yellow-500 font-black text-xl flex items-center justify-center gap-1"><Icon name="coin" className="w-4 h-4"/>{balance.toFixed(2)}</div></div>
+<div className="profile-stat text-center"><div className="text-gray-500 text-xs uppercase tracking-wider mb-1">Предметов</div><div className="text-blue-400 font-black text-xl">{inv.length}</div></div>
+<div className="profile-stat text-center"><div className="text-gray-500 text-xs uppercase tracking-wider mb-1">Успешных</div><div className="text-green-400 font-black text-xl">{wins}</div></div>
+<div className="profile-stat text-center"><div className="text-gray-500 text-xs uppercase tracking-wider mb-1">Неудачных</div><div className="text-red-400 font-black text-xl">{losses}</div></div>
+</div>
+<div className="profile-stat mb-6">
+<div className="flex justify-between items-center mb-3"><span className="text-gray-400 text-sm font-semibold">Общий винрейт</span><span className="text-white font-black text-lg">{winRate}%</span></div>
+<div className="w-full h-2 bg-black/40 rounded-full overflow-hidden"><div className="h-full rounded-full" style={{width:`${winRate}%`,background:parseFloat(winRate)>=50?'linear-gradient(90deg,#10b981,#059669)':'linear-gradient(90deg,#ef4444,#dc2626)'}}></div></div>
+<p className="text-gray-600 text-xs mt-3">Всего апгрейдов: <span className="text-white font-bold">{total}</span></p>
+</div>
+<div>
+<h4 className="text-white font-bold text-sm mb-3">Последние апгрейды</h4>
+{history.length===0?(<div className="text-gray-600 text-xs text-center py-6 bg-black/30 rounded-xl">Ты ещё не делал апгрейдов</div>):(
+<div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+{history.slice(0,10).map(h=>(
+<div key={h.id} className={`flex justify-between items-center text-xs p-3 rounded-xl border-l-2 ${h.win?'border-green-500 bg-green-500/5':'border-red-500 bg-red-500/5'}`}>
+<div className="flex-1 min-w-0"><div className="text-white truncate">{h.from} → {h.to}</div><div className="text-gray-500 mt-1">Шанс: {h.chance}% • {h.time}</div></div>
+<div className={`font-black ml-3 ${h.win?'text-green-400':'text-red-400'}`}>{h.win?'✓':'✕'}</div>
+</div>
+))}
+</div>
+)}
+</div>
+</div>
+</div>
+);
+};
+
+const AdminPanel=({adminUser,adminPass,onClose})=>{
+const [targetUser,setTargetUser]=useState("");
+const [amount,setAmount]=useState("");
+const [message,setMessage]=useState(null);
+const [users,setUsers]=useState([]);
+
+const refresh=async()=>{
+try{
+const data=await api("/api/admin/list",{adminUser,adminPass,admins:ADMINS});
+setUsers(data.users);
+}catch(e){setMessage({type:"error",text:e.message});}
+};
+
+useEffect(()=>{refresh();},[]);
+
+const handleSubmit=async()=>{
+setMessage(null);
+try{
+const data=await api("/api/admin/grant",{adminUser,adminPass,targetUser:targetUser.trim(),amount:Number(amount),admins:ADMINS});
+setMessage({type:"success",text:data.text});
+setTargetUser("");
+setAmount("");
+refresh();
+}catch(e){setMessage({type:"error",text:e.message});}
+};
+
+return (
+<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-fade-in" onClick={onClose}>
+<div className="glass-strong border border-red-500/30 rounded-3xl p-8 max-w-2xl w-full shadow-2xl animate-slide-up" onClick={(e)=>e.stopPropagation()}>
+<div className="flex justify-between items-center mb-6">
+<div className="flex items-center gap-3">
+<div className="w-10 h-10 rounded-xl bg-red-500/20 flex items-center justify-center text-red-400"><Icon name="admin"/></div>
+<h2 className="text-white font-bold text-2xl">Админ-панель</h2>
+</div>
+<button onClick={onClose} className="text-gray-500 hover:text-white"><Icon name="close"/></button>
+</div>
+<div className="space-y-4 mb-6">
+<div>
+<label className="text-gray-400 text-xs font-semibold uppercase tracking-wider block mb-2">Введите логин игрока, которому хотите выдать монеты</label>
+<input type="text" value={targetUser} onChange={(e)=>setTargetUser(e.target.value)} className="w-full bg-black/40 border border-white/10 focus:border-blue-500 text-white px-4 py-3 rounded-xl outline-none" placeholder="Логин игрока" />
+</div>
+<div>
+<label className="text-gray-400 text-xs font-semibold uppercase tracking-wider block mb-2">Введите кол-во монет</label>
+<input type="number" value={amount} onChange={(e)=>setAmount(e.target.value)} className="w-full bg-black/40 border border-white/10 focus:border-blue-500 text-white px-4 py-3 rounded-xl outline-none" placeholder="Например: 100 (или -50 для списания)" />
+</div>
+<button onClick={handleSubmit} className="btn-primary w-full text-white font-bold py-3 rounded-xl">Начислить / Списать</button>
+{message&&<div className={`p-3 rounded-xl text-sm text-center font-bold border ${message.type==="success"?'bg-green-500/10 text-green-400 border-green-500/20':'bg-red-500/10 text-red-400 border-red-500/20'}`}>{message.text}</div>}
+</div>
+<div className="border-t border-white/5 pt-5">
+<h3 className="text-white font-bold mb-3 text-sm">Все игроки ({users.length}):</h3>
+<div className="max-h-44 overflow-y-auto space-y-1 pr-1">
+{users.length===0&&<div className="text-gray-500 text-xs text-center py-4">Нет игроков</div>}
+{users.map(u=>(
+<div key={u.username} className="flex justify-between items-center text-xs bg-black/30 p-3 rounded-xl">
+<span className="text-white font-bold">{u.username}</span>
+<div className="flex items-center gap-4">
+<span className="text-yellow-500 flex items-center gap-1"><Icon name="coin" className="w-3 h-3"/>{u.balance.toFixed(2)}</span>
+<span className="text-gray-500 flex items-center gap-1"><Icon name="inventory" className="w-3 h-3"/>{u.inventoryCount}</span>
+</div>
+</div>
+))}
+</div>
+</div>
+<div className="mt-5 text-center text-xs text-gray-600">Нажмите Esc чтобы закрыть</div>
+</div>
+</div>
+);
+};
+
+const App=()=>{
+const [currentUser,setCurrentUser]=useState(null);
+const [currentPass,setCurrentPass]=useState(null);
+const [userData,setUserData]=useState(null);
+const [activeTab,setActiveTab]=useState("upgrade");
+const [showDeposit,setShowDeposit]=useState(false);
+const [withdrawItem,setWithdrawItem]=useState(null);
+const [withdrawTime,setWithdrawTime]=useState("");
+const [withdrawLegit,setWithdrawLegit]=useState(true);
+const [withdrawSource,setWithdrawSource]=useState("");
+const [notifications,setNotifications]=useState([]);
+const [showAdmin,setShowAdmin]=useState(false);
+const [showProfile,setShowProfile]=useState(false);
+const [selectedItem,setSelectedItem]=useState(null);
+const [targetItem,setTargetItem]=useState(null);
+const [chance,setChance]=useState(0);
+const [isSpinning,setIsSpinning]=useState(false);
+const [spinResult,setSpinResult]=useState(null);
+
+const isAdmin=currentUser&&ADMINS.includes(currentUser.toLowerCase());
+
+useEffect(()=>{
+if(!currentUser||!currentPass)return;
+const interval=setInterval(async()=>{
+try{
+const data=await api("/api/notifications/consume",{username:currentUser,password:currentPass});
+if(data.notifications&&data.notifications.length>0){
+setNotifications(prev=>[...prev,...data.notifications]);
+}
+const u=await api("/api/user",{username:currentUser,password:currentPass});
+setUserData(prev=>({...prev,balance:u.balance,inventory:u.inventory,history:u.history,createdAt:u.createdAt}));
+}catch(e){}
+},5000);
+return ()=>clearInterval(interval);
+},[currentUser,currentPass]);
+
+useEffect(()=>{
+const pressed=new Set();
+const onDown=(e)=>{
+pressed.add(e.key);
+if(pressed.has("End")&&pressed.has("PageUp")){setShowAdmin(true);pressed.clear();}
+if(e.key==="Escape"){setShowAdmin(false);setShowProfile(false);}
+};
+const onUp=(e)=>pressed.delete(e.key);
+window.addEventListener("keydown",onDown);
+window.addEventListener("keyup",onUp);
+return ()=>{window.removeEventListener("keydown",onDown);window.removeEventListener("keyup",onUp);};
+},[]);
+
+useEffect(()=>{
+if(selectedItem&&targetItem){
+let c=(selectedItem.price/targetItem.price)*100;
+if(c>90)c=90;
+setChance(parseFloat(c.toFixed(2)));
+}else{setChance(0);}
+},[selectedItem,targetItem]);
+
+const handleUpgrade=()=>{
+if(!selectedItem||!targetItem||isSpinning||!userData)return;
+const idx=(userData.inventory||[]).findIndex(i=>i.id===selectedItem.id);
+if(idx===-1){alert("У вас нет этого предмета в инвентаре! Купите его в магазине.");return;}
+setIsSpinning(true);
+setSpinResult(null);
+setTimeout(async()=>{
+try{
+const data=await api("/api/upgrade",{username:currentUser,password:currentPass,fromItemId:selectedItem.id,toItemId:targetItem.id,items:ITEMS});
+setUserData({...userData,balance:data.balance,inventory:data.inventory,history:data.history});
+setIsSpinning(false);
+setSpinResult(data.win);
+setTimeout(()=>{setSelectedItem(null);setTargetItem(null);setSpinResult(null);},2200);
+}catch(e){
+setIsSpinning(false);
+alert(e.message);
+}
+},2000);
+};
+
+const handleBuy=async(item)=>{
+if(!userData)return;
+if(userData.balance<item.price)return alert("Недостаточно монет!");
+try{
+const data=await api("/api/buy",{username:currentUser,password:currentPass,item});
+setUserData({...userData,balance:data.balance,inventory:data.inventory});
+}catch(e){alert(e.message);}
+};
+
+const handleWithdraw=(item)=>{
+const now=new Date();
+const time=now.toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+setWithdrawItem(item);
+setWithdrawTime(time);
+setWithdrawLegit(item.legit===true);
+setWithdrawSource(item.source||"");
+};
+
+const handleLogout=()=>{setCurrentUser(null);setCurrentPass(null);setUserData(null);};
+
+if(!currentUser||!userData)return <AuthScreen onAuth={(u,p,data)=>{setCurrentUser(u);setCurrentPass(p);setUserData(data);}}/>;
+
+const inventory=userData.inventory||[];
+const balance=typeof userData.balance==="number"?userData.balance:0;
+
+return (
+<div className="min-h-screen flex flex-col">
+<header className="glass border-b border-white/5 px-6 py-3 sticky top-0 z-50">
+<div className="max-w-7xl mx-auto flex justify-between items-center gap-6">
+<div className="flex items-center gap-2">
+<span className="text-2xl font-black bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent">FreeDon</span>
+<span className="text-xl font-black text-white">Upgrader</span>
+{isAdmin&&<span className="ml-2 text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded font-bold tracking-wider">ADMIN</span>}
+</div>
+<nav className="flex gap-6">
+<button onClick={()=>setActiveTab("upgrade")} className={`tab-btn ${activeTab==="upgrade"?"active":""}`}>Апгрейд</button>
+<button onClick={()=>setActiveTab("shop")} className={`tab-btn ${activeTab==="shop"?"active":""}`}>Магазин</button>
+</nav>
+<div className="flex items-center gap-4">
+<div className="flex items-center gap-2 glass px-4 py-2 rounded-full"><Icon name="coin" className="w-4 h-4 text-yellow-500"/><span className="font-bold text-white">{balance.toFixed(2)}</span></div>
+<button onClick={()=>setShowDeposit(true)} className="btn-primary text-white px-5 py-2 rounded-full font-bold text-sm">Пополнить</button>
+<div className="flex items-center gap-1">
+<button onClick={()=>setShowProfile(true)} className="user-chip" title="Профиль">
+<div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center font-bold text-sm">{currentUser[0].toUpperCase()}</div>
+<span className="text-white text-sm font-bold hidden md:block">{currentUser}</span>
+</button>
+<button onClick={handleLogout} className="text-gray-500 hover:text-red-400 transition p-2" title="Выйти"><Icon name="logout"/></button>
+</div>
+</div>
+</div>
+</header>
+
+{notifications.length>0&&(
+<div className="fixed top-24 right-6 z-[150] space-y-3">
+{notifications.map((n,i)=>(
+<div key={i} className="notification text-white px-5 py-4 rounded-2xl flex items-center gap-3 animate-slide-in">
+<div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center"><Icon name="money" className="w-5 h-5"/></div>
+<span className="font-bold text-sm">{n}</span>
+<button onClick={()=>setNotifications(notifications.filter((_,idx)=>idx!==i))} className="ml-3 text-white/70 hover:text-white"><Icon name="close" className="w-4 h-4"/></button>
+</div>
+))}
+</div>
+)}
+
+{showDeposit&&(
+<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-fade-in" onClick={()=>setShowDeposit(false)}>
+<div className="glass-strong rounded-3xl p-8 max-w-md w-full text-center shadow-2xl animate-slide-up" onClick={(e)=>e.stopPropagation()}>
+<div className="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center mx-auto mb-4 text-blue-400"><Icon name="money" className="w-8 h-8"/></div>
+<h3 className="text-white font-bold text-xl mb-3">Пополнение баланса</h3>
+<p className="text-gray-400 mb-6 text-sm">Чтобы пополнить баланс, напишите мне в Discord:</p>
+<div className="bg-black/40 border border-blue-500/30 rounded-2xl py-4 px-4 mb-6"><span className="text-blue-400 font-black text-2xl select-all">akaidzu</span></div>
+<button onClick={()=>setShowDeposit(false)} className="btn-primary w-full text-white font-bold py-3 rounded-xl">Понятно</button>
+</div>
+</div>
+)}
+
+{withdrawItem&&(
+<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-fade-in" onClick={()=>setWithdrawItem(null)}>
+<div className="glass-strong rounded-3xl p-8 max-w-lg w-full text-center shadow-2xl animate-slide-up" onClick={(e)=>e.stopPropagation()}>
+{withdrawLegit?(
+<>
+<div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-4 text-green-400"><Icon name="check" className="w-8 h-8"/></div>
+<h3 className="text-green-400 font-bold text-xl mb-4">Заявка на вывод создана!</h3>
+<p className="text-gray-300 mb-4 text-sm">Сделайте скриншот окна и отправьте мне в Discord:</p>
+<div className="bg-black/40 border border-blue-500/30 rounded-2xl py-3 px-4 mb-5 inline-block"><span className="text-blue-400 font-black text-xl select-all">@akaidzu</span></div>
+<div className="bg-black/50 rounded-2xl p-5 my-4 text-left text-sm border border-white/5 space-y-2">
+<div className="flex justify-between"><span className="text-gray-500">ID заявки:</span><span className="text-yellow-400 font-black tracking-wider select-all">#{withdrawItem.ticketId||"—"}</span></div>
+<div className="flex justify-between"><span className="text-gray-500">Логин:</span><span className="text-white font-bold">{currentUser}</span></div>
+<div className="flex justify-between"><span className="text-gray-500">Предмет:</span><span className="text-white font-bold">{withdrawItem.name}</span></div>
+<div className="flex justify-between"><span className="text-gray-500">Время:</span><span className="text-white font-bold">{withdrawTime}</span></div>
+<div className="flex justify-between pt-3 border-t border-white/5">
+<span className="text-gray-500">Статус:</span>
+<span className="text-green-400 font-bold">{withdrawSource==="upgrade"?"Предмет получен в апгрейде":withdrawSource==="shop"?"Предмет куплен в магазине":"Предмет получен честно"}</span>
+</div>
+</div>
+</>
+):(
+<>
+<div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4 text-red-400"><Icon name="warn" className="w-8 h-8"/></div>
+<h3 className="text-red-400 font-bold text-xl mb-3">Заявка отклонена</h3>
+<p className="text-red-300 font-semibold">Предмет получен нечестно</p>
+</>
+)}
+<button onClick={()=>setWithdrawItem(null)} className="btn-primary w-full text-white font-bold py-3 rounded-xl mt-5">Закрыть</button>
+</div>
+</div>
+)}
+
+{showAdmin&&isAdmin&&<AdminPanel adminUser={currentUser} adminPass={currentPass} onClose={()=>setShowAdmin(false)}/>}
+{showAdmin&&!isAdmin&&(
+<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-fade-in" onClick={()=>setShowAdmin(false)}>
+<div className="glass-strong border border-red-500/30 rounded-3xl p-8 max-w-md text-center animate-slide-up">
+<div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-4 text-red-400"><Icon name="warn" className="w-8 h-8"/></div>
+<h3 className="text-red-400 font-bold text-xl mb-2">Доступ запрещён</h3>
+<p className="text-gray-400 text-sm mb-5">У вас нет прав администратора.</p>
+<button onClick={()=>setShowAdmin(false)} className="btn-primary px-8 py-3 rounded-xl font-bold">Ок</button>
+</div>
+</div>
+)}
+
+{showProfile&&userData&&(<ProfileModal user={currentUser} data={userData} onClose={()=>setShowProfile(false)}/>)}
+
+<main className="flex-1 p-6 grid grid-cols-12 gap-6 max-w-7xl mx-auto w-full">
+<div className="col-span-12 lg:col-span-4 glass rounded-3xl p-5 h-fit">
+<div className="flex items-center justify-between mb-4">
+<div className="flex items-center gap-2 text-white font-bold"><Icon name="inventory" className="w-5 h-5 text-blue-400"/><span>Инвентарь</span></div>
+<span className="text-xs text-gray-500 bg-black/40 px-2 py-1 rounded-full">{inventory.length} шт.</span>
+</div>
+{inventory.length===0?(
+<div className="text-gray-600 text-sm text-center py-10"><div className="text-4xl mb-3 opacity-30">📦</div>Инвентарь пуст.<br/>Купите предметы в магазине.</div>
+):(
+<div className="grid grid-cols-2 gap-3 max-h-[620px] overflow-y-auto pr-1">
+{inventory.map((item,idx)=>(<InventoryItem key={`${item.id}-${idx}`} item={item} onWithdraw={handleWithdraw}/>))}
+</div>
+)}
+</div>
+
+<div className="col-span-12 lg:col-span-5 flex flex-col gap-5">
+{activeTab==="upgrade"?(
+<>
+<div className="glass rounded-3xl p-6">
+<div className="flex items-center justify-between gap-4">
+<div className="flex-1 h-28 glass rounded-2xl border border-dashed border-white/10 flex items-center justify-center text-center px-2">
+{selectedItem?<span className="text-white text-xs font-bold">{selectedItem.name}</span>:<span className="text-gray-600 text-xs">Выберите предмет</span>}
+</div>
+<div className="flex flex-col items-center">
+<div className={`wheel w-32 h-32 ${isSpinning?'spinning-wheel':''}`} style={{'--chance':`${chance}%`}}>
+<div className="absolute -top-2 text-red-500 text-xl">▼</div>
+<div className="wheel-inner w-24 h-24">
+<span className="text-xl font-black text-white">{chance}%</span>
+<span className="text-[9px] text-gray-500 uppercase tracking-wider">{isSpinning?'крутим':'шанс'}</span>
+</div>
+</div>
+<button onClick={handleUpgrade} disabled={!selectedItem||!targetItem||isSpinning} className="btn-primary mt-4 px-6 py-2.5 rounded-xl text-white font-bold text-sm min-w-[120px]">{isSpinning?'Крутим...':'АПГРЕЙД'}</button>
+</div>
+<div className="flex-1 h-28 glass rounded-2xl border border-dashed border-white/10 flex items-center justify-center text-center px-2">
+{targetItem?<span className="text-white text-xs font-bold">{targetItem.name}</span>:<span className="text-gray-600 text-xs">Выберите скин</span>}
+</div>
+</div>
+{spinResult!==null&&(<div className={`mt-4 text-center font-bold text-lg ${spinResult?'text-green-400':'text-red-400'}`}>{spinResult?'🎉 ПОБЕДА!':'💀 ПРОИГРЫШ'}</div>)}
+</div>
+
+<div className="glass rounded-3xl p-5">
+<div className="flex items-center gap-2 text-white font-bold mb-4"><Icon name="upgrade" className="w-5 h-5 text-blue-400"/><span>Выберите скин</span></div>
+<div className="grid grid-cols-3 gap-3">
+{ITEMS.map(item=>(
+<ItemCard key={item.id} item={item} isSelected={selectedItem?.id===item.id||targetItem?.id===item.id}
+onClick={()=>{if(!selectedItem)setSelectedItem(item);else if(selectedItem.id===item.id)setSelectedItem(null);else setTargetItem(item);}}/>
+))}
+</div>
+<p className="text-xs text-gray-600 text-center mt-4">Первый клик — «Ваш предмет» (должен быть в инвентаре), второй — «Целевой»</p>
+</div>
+</>
+):(
+<div className="glass rounded-3xl p-5">
+<div className="flex items-center gap-2 text-white font-bold mb-4"><Icon name="shop" className="w-5 h-5 text-green-400"/><span>Магазин предметов</span></div>
+<p className="text-xs text-gray-500 mb-4">Баланс: <span className="text-yellow-500 font-bold">{balance.toFixed(2)}</span></p>
+<div className="grid grid-cols-3 gap-3">
+{ITEMS.map(item=>(
+<div key={item.id} className="space-y-2">
+<ItemCard item={item} isSelected={false} onClick={()=>{}}/>
+<button onClick={()=>handleBuy(item)} disabled={balance<item.price} className={`w-full text-xs font-bold py-2 rounded-lg transition ${balance<item.price?'bg-gray-800 text-gray-600 cursor-not-allowed':'btn-success text-white'}`}>
+{balance<item.price?'Мало монет':`Купить за ${item.price}`}
+</button>
+</div>
+))}
+</div>
+</div>
+)}
+</div>
+
+<div className="col-span-12 lg:col-span-3 glass rounded-3xl p-5 h-fit">
+<div className="flex items-center gap-2 text-white font-bold mb-4"><Icon name="history" className="w-5 h-5 text-purple-400"/><span>История</span></div>
+<div className="space-y-2 max-h-[620px] overflow-y-auto pr-1">
+{(userData.history||[]).length===0&&(<div className="text-gray-600 text-xs text-center py-8">История пуста</div>)}
+{(userData.history||[]).map((h)=>(
+<div key={h.id} className={`p-3 rounded-xl text-xs border-l-2 ${h.win?'border-green-500 bg-green-500/5':'border-red-500 bg-red-500/5'}`}>
+<div className="flex justify-between text-gray-500 mb-1">
+<span>{h.time}</span>
+<span className={h.win?'text-green-400 font-bold':'text-red-400 font-bold'}>{h.win?'УСПЕХ':'НЕУДАЧА'}</span>
+</div>
+<div className="text-white text-xs truncate mb-1">{h.from} → {h.to}</div>
+<div className="text-gray-500">Шанс: {h.chance}%</div>
+</div>
+))}
+</div>
+</div>
+</main>
+
+<footer className="text-center text-xs text-gray-700 py-6">FreeDon Upgrader © {new Date().getFullYear()}</footer>
+</div>
+);
+};
+
+const root=ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App/>);
+</script>
+</body>
+</html>
