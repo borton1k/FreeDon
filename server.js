@@ -16,10 +16,11 @@ const ITEMS=[
 {id:11,name:"Талисман Sponsor",price:50,color:"#ef4444"}
 ];
 const CASES={
-hach:{id:"hach",name:"Хач",price:4,emoji:"🥉",min:3,max:5,weights:[50,30,20]},
-harosh:{id:"harosh",name:"Харош",price:10,emoji:"🥈",min:8,max:12,weights:[50,30,20]},
-legenda:{id:"legenda",name:"Легенда",price:20,emoji:"🥇",min:15,max:25,weights:[65,35]},
-sigma:{id:"sigma",name:"Сигма",price:40,emoji:"💎",min:35,max:50,weights:[70,30]}
+hach:{id:"hach",name:"Хач",price:4,emoji:"🥉",type:"range",min:3,max:5,weights:[50,30,20]},
+harosh:{id:"harosh",name:"Харош",price:10,emoji:"🥈",type:"range",min:8,max:12,weights:[50,30,20]},
+legenda:{id:"legenda",name:"Легенда",price:20,emoji:"🥇",type:"range",min:15,max:25,weights:[65,35]},
+sigma:{id:"sigma",name:"Сигма",price:40,emoji:"💎",type:"range",min:35,max:50,weights:[70,30]},
+allornothing:{id:"allornothing",name:"Всё или ничего",price:25,emoji:"💀",type:"fixed",items:[3,11],weights:[95,5]}
 };
 function loadDB(){try{const raw=fs.readFileSync(DB_FILE,'utf8');const d=JSON.parse(raw);if(!d.users)d.users={};if(!d.promocodes)d.promocodes={};return d;}catch(e){return{users:{},promocodes:{}};}}
 function saveDB(db){fs.writeFileSync(DB_FILE,JSON.stringify(db,null,2),'utf8');}
@@ -115,7 +116,11 @@ res.json({leaderboard:list.slice(0,20)});
 });
 
 app.post('/api/cases/list',(req,res)=>{
-const list=Object.values(CASES).map(c=>({id:c.id,name:c.name,price:c.price,emoji:c.emoji,min:c.min,max:c.max}));
+const list=Object.values(CASES).map(c=>({
+id:c.id,name:c.name,price:c.price,emoji:c.emoji,
+min:c.type==='range'?c.min:Math.min(...c.items.map(id=>ITEMS.find(i=>i.id===id).price)),
+max:c.type==='range'?c.max:Math.max(...c.items.map(id=>ITEMS.find(i=>i.id===id).price))
+}));
 res.json({cases:list});
 });
 
@@ -130,9 +135,18 @@ if(!user)return res.status(404).json({error:'Не найден'});
 bcrypt.compare(password,user.hash).then(ok=>{
 if(!ok)return res.status(403).json({error:'Неверный пароль'});
 if(user.balance<c.price)return res.status(400).json({error:'Недостаточно монет'});
-const available=ITEMS.filter(i=>i.price>=c.min&&i.price<=c.max).sort((a,b)=>a.price-b.price);
+
+let available;
+let weights;
+if(c.type==='range'){
+available=ITEMS.filter(i=>i.price>=c.min&&i.price<=c.max).sort((a,b)=>a.price-b.price);
+weights=c.weights.slice(0,available.length);
+}else{
+available=c.items.map(id=>ITEMS.find(i=>i.id===id)).sort((a,b)=>a.price-b.price);
+weights=c.weights.slice(0,available.length);
+}
+
 if(available.length===0)return res.status(400).json({error:'Нет предметов для этого кейса'});
-const weights=c.weights.slice(0,available.length);
 const totalW=weights.reduce((s,w)=>s+w,0);
 let roll=Math.random()*totalW;
 let picked=available[available.length-1];
@@ -140,6 +154,7 @@ for(let i=0;i<available.length;i++){
 roll-=weights[i];
 if(roll<=0){picked=available[i];break;}
 }
+
 user.balance-=c.price;
 const newItem={...picked,legit:true,source:'case',obtainedAt:Date.now(),ticketId:genTicket()};
 user.inventory.push(newItem);
