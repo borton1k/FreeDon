@@ -41,17 +41,22 @@ body{background:radial-gradient(circle at 20% 0%,rgba(59,130,246,0.15),transpare
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 @keyframes slideInRight{from{opacity:0;transform:translateX(100px)}to{opacity:1;transform:translateX(0)}}
+@keyframes caseOpen{0%{transform:scale(1) rotate(0)}50%{transform:scale(1.2) rotate(180deg)}100%{transform:scale(1) rotate(360deg)}}
 .animate-fade-in{animation:fadeIn 0.2s ease-out}
 .animate-slide-up{animation:slideUp 0.3s}
 .animate-slide-in{animation:slideInRight 0.4s}
+.animate-case-open{animation:caseOpen 1s ease-in-out}
 .notification{background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 8px 30px rgba(16,185,129,0.4)}
 .modal-content{background:rgba(20,25,38,0.97);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08)}
 .profile-stat{background:rgba(0,0,0,0.35);border:1px solid rgba(255,255,255,0.05);border-radius:14px;padding:16px}
-.profile-avatar{width:88px;height:88px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:900;color:#fff;box-shadow:0 8px 30px rgba(139,92,246,0.4);margin:0 auto 16px}
+.profile-avatar{width:88px;height:88px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:44px;font-weight:900;color:#fff;box-shadow:0 8px 30px rgba(139,92,246,0.4);margin:0 auto 16px}
 .user-chip{display:flex;align-items:center;gap:8px;padding:4px 10px 4px 4px;border-radius:999px;cursor:pointer;border:1px solid transparent;background:transparent}
 .user-chip:hover{background:rgba(255,255,255,0.05);border-color:rgba(255,255,255,0.1)}
 .spinner{width:32px;height:32px;border:3px solid rgba(59,130,246,0.2);border-top-color:#3b82f6;border-radius:50%;animation:spin 0.7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+.case-card{position:relative;background:linear-gradient(160deg,rgba(30,38,55,0.9),rgba(20,26,40,0.9));border:1px solid rgba(255,255,255,0.05);border-radius:16px;padding:20px;transition:all 0.25s;cursor:pointer;text-align:center}
+.case-card:hover{transform:translateY(-4px);border-color:rgba(59,130,246,0.5);box-shadow:0 12px 30px rgba(59,130,246,0.15)}
+.case-card.disabled{opacity:0.5;cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -60,6 +65,7 @@ body{background:radial-gradient(circle at 20% 0%,rgba(59,130,246,0.15),transpare
 const {useState,useEffect}=React;
 const API="";
 const ADMINS=["akaidzu"];
+const AVATARS=["🦊","🐺","🐯","🦁","🐸","🐲","🐉","🦅","🦉","🐙"];
 const ITEMS=[
 {id:1,name:"Тотем Бессмертия",price:3,color:"#9ca3af"},
 {id:2,name:"Сет Алмазной Брони З4",price:4,color:"#9ca3af"},
@@ -93,7 +99,9 @@ check:<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>,
 warn:<path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>,
 money:<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.16-1.46-3.27-3.4h1.96c.1.99.86 1.57 2.18 1.57 1.24 0 1.94-.55 1.94-1.38 0-.77-.51-1.24-2.42-1.79-2.13-.62-3.15-1.48-3.15-3.03 0-1.65 1.29-2.76 2.76-3.07V5h2.67v1.96c1.63.36 2.75 1.42 2.86 3.07h-1.99c-.08-.85-.7-1.45-1.97-1.45-1.17 0-1.83.5-1.83 1.28 0 .73.53 1.16 2.43 1.71 2.13.62 3.12 1.5 3.12 3.09 0 1.79-1.36 2.85-2.63 3.13z"/>,
 gift:<path d="M20 6h-2.18c.11-.31.18-.65.18-1 0-1.66-1.34-3-3-3-1.05 0-1.96.54-2.5 1.35l-.5.67-.5-.68C10.96 2.54 10.05 2 9 2 7.34 2 6 3.34 6 5c0 .35.07.69.18 1H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-5-2c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zM9 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm11 15H4v-2h16v2zm0-5H4V8h5.08L7 10.83 8.62 12 11 8.76l1-1.36 1 1.36L15.38 12 17 10.83 14.92 8H20v6z"/>,
-promo:<path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58s1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41s-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
+promo:<path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58s1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41s-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>,
+case:<path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .89-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/>,
+trophy:<path d="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"/>
 };
 return <svg className={className} viewBox="0 0 24 24" fill="currentColor">{icons[name]}</svg>;
 };
@@ -236,7 +244,7 @@ const InventoryItem=({item,onWithdraw})=>(
 </div>
 );
 
-const ProfileModal=({user,data,onClose})=>{
+const ProfileModal=({user,data,onClose,onAvatarChange})=>{
 const history=data.history||[];
 const wins=history.filter(h=>h.win).length;
 const losses=history.filter(h=>!h.win).length;
@@ -247,6 +255,7 @@ const balance=typeof data.balance==="number"?data.balance:0;
 const created=data.createdAt?new Date(data.createdAt):null;
 const createdStr=created?created.toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):"Неизвестно";
 const days=created?Math.floor((Date.now()-created.getTime())/86400000):0;
+const [showAvatars,setShowAvatars]=useState(false);
 return (
 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-fade-in" onClick={onClose}>
 <div className="modal-content rounded-3xl p-8 max-w-2xl w-full shadow-2xl animate-slide-up max-h-[90vh] overflow-y-auto" onClick={(e)=>e.stopPropagation()}>
@@ -255,10 +264,18 @@ return (
 <button onClick={onClose} className="text-gray-500 hover:text-white"><Icon name="close"/></button>
 </div>
 <div className="text-center mb-8">
-<div className="profile-avatar">{user[0].toUpperCase()}</div>
+<div className="profile-avatar">{data.avatar||"🦊"}</div>
 <h3 className="text-white font-black text-2xl mb-1">{user}</h3>
 <p className="text-gray-500 text-sm">Зарегистрирован: {createdStr}</p>
 {created&&<p className="text-gray-600 text-xs mt-1">{days===0?"Сегодня в игре":`В игре ${days} ${days===1?"день":days<5?"дня":"дней"}`}</p>}
+<button onClick={()=>setShowAvatars(!showAvatars)} className="mt-4 bg-black/40 hover:bg-black/60 border border-white/10 text-white text-xs font-bold py-2 px-4 rounded-lg transition">🎨 Сменить аватарку</button>
+{showAvatars&&(
+<div className="mt-4 grid grid-cols-5 gap-2 max-w-xs mx-auto">
+{AVATARS.map(a=>(
+<button key={a} onClick={()=>{onAvatarChange(a);setShowAvatars(false);}} className={`text-3xl p-2 rounded-xl transition hover:scale-110 ${data.avatar===a?'bg-blue-500/30 border-2 border-blue-500':'bg-black/40 border border-white/10'}`}>{a}</button>
+))}
+</div>
+)}
 </div>
 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
 <div className="profile-stat text-center"><div className="text-gray-500 text-xs uppercase tracking-wider mb-1">Монет</div><div className="text-yellow-500 font-black text-xl flex items-center justify-center gap-1"><Icon name="coin" className="w-4 h-4"/>{balance.toFixed(2)}</div></div>
@@ -409,6 +426,7 @@ return (
 {users.map(u=>(
 <div key={u.username} className="flex justify-between items-center text-xs bg-black/30 p-3 rounded-xl flex-wrap gap-2">
 <div className="flex items-center gap-2">
+<span className="text-2xl">{u.avatar||"🦊"}</span>
 <span className="text-white font-bold">{u.username}</span>
 <span className={`text-[9px] px-1.5 py-0.5 rounded ${u.luckMode==="win"?"bg-green-500/30 text-green-400":u.luckMode==="lose"?"bg-red-500/30 text-red-400":"bg-gray-500/20 text-gray-400"}`}>{u.luckMode==="win"?"ПОБЕДА":u.luckMode==="lose"?"ПРОИГРЫШ":"СЛУЧАЙНО"}</span>
 </div>
@@ -506,92 +524,85 @@ return (
 );
 };
 
-const DailyBonusModal=({open,onClose,onResult,username,password})=>{
-const [spinning,setSpinning]=useState(false);
-const [angle,setAngle]=useState(0);
-const [result,setResult]=useState(null);
-const sectors=[?,?,?,?,?,?];
-const sectorAngle=360/sectors.length;
-const colors=["#ef4444","#3b82f6","#10b981","#a855f7","#f59e0b","#ec4899"];
-
-const spin=async()=>{
-if(spinning)return;
-setSpinning(true);
-setResult(null);
-try{
-const data=await api("/api/daily-bonus",{username,password});
-const reward=data.reward;
-const sectorIdx=data.sectorIndex;
-
-// Сектор i занимает углы [i*sectorAngle, (i+1)*sectorAngle] от верхней точки по часовой
-const sectorStart=sectorIdx*sectorAngle;
-const padding=sectorAngle*0.15;
-const randomStop=sectorStart+padding+Math.random()*(sectorAngle-2*padding);
-
-// Стрелка сверху, чтобы указать на randomStop — крутим на 1080 + (360 - randomStop)
-const targetAngle=1080+(360-randomStop);
-
-setAngle(targetAngle);
-
-// Сразу обновляем баланс на сервере уже произошло начисление
-setTimeout(()=>{
-setResult(reward);
-setSpinning(false);
-if(onResult)onResult(data.balance,data.lastDailyBonus);
-},3100);
-}catch(e){
-setSpinning(false);
-alert(e.message);
-onClose();
-}
+const CasesView=({balance,onOpen,opening,lastResult})=>{
+const cases=[
+{id:"hach",name:"Хач",price:4,emoji:"🥉",min:3,max:5},
+{id:"harosh",name:"Харош",price:10,emoji:"🥈",min:8,max:12},
+{id:"legenda",name:"Легенда",price:20,emoji:"🥇",min:15,max:25},
+{id:"sigma",name:"Сигма",price:40,emoji:"💎",min:35,max:50}
+];
+return (
+<div className="glass rounded-3xl p-5">
+<div className="flex items-center gap-2 text-white font-bold mb-4"><Icon name="case" className="w-5 h-5 text-purple-400"/><span>Кейсы</span></div>
+<p className="text-xs text-gray-500 mb-4">Баланс: <span className="text-yellow-500 font-bold">{balance.toFixed(2)}</span></p>
+<div className="grid grid-cols-2 gap-3">
+{cases.map(c=>(
+<div key={c.id} className={`case-card ${balance<c.price||opening?'disabled':''}`} onClick={()=>{if(!opening&&balance>=c.price)onOpen(c);}}>
+<div className="text-5xl mb-2">{c.emoji}</div>
+<div className="text-white font-bold text-lg mb-1">{c.name}</div>
+<div className="text-gray-500 text-xs mb-2">Предметы: {c.min}–{c.max} монет</div>
+<div className="flex items-center justify-center gap-1 text-yellow-500 font-bold text-sm"><Icon name="coin" className="w-3 h-3"/>{c.price}</div>
+</div>
+))}
+</div>
+{opening&&(
+<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-fade-in">
+<div className="glass-strong rounded-3xl p-10 max-w-md w-full text-center shadow-2xl animate-slide-up">
+<div className="text-7xl mb-4 animate-case-open">🎁</div>
+<h3 className="text-white font-bold text-xl mb-4">Открываем кейс...</h3>
+<div className="spinner mx-auto"></div>
+</div>
+</div>
+)}
+{lastResult&&!opening&&(
+<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-fade-in">
+<div className="glass-strong rounded-3xl p-8 max-w-md w-full text-center shadow-2xl animate-slide-up">
+<div className="text-6xl mb-4">🎉</div>
+<div className="text-gray-400 text-sm mb-2">Вы получили:</div>
+<div className="text-2xl font-black text-white mb-4">{lastResult.item.name}</div>
+<div className="flex items-center justify-center gap-2 text-yellow-500 font-bold text-lg mb-6">
+<Icon name="coin" className="w-5 h-5"/>{lastResult.item.price}
+</div>
+<button onClick={lastResult.onClose} className="btn-primary w-full text-white font-bold py-3 rounded-xl">Забрать</button>
+</div>
+</div>
+)}
+</div>
+);
 };
 
+const LeaderboardView=({onLoad})=>{
+const [list,setList]=useState([]);
+const [loading,setLoading]=useState(true);
+useEffect(()=>{
+api("/api/leaderboard",{}).then(d=>{setList(d.leaderboard);setLoading(false);}).catch(()=>setLoading(false));
+},[]);
+const medals=["🥇","🥈","🥉"];
 return (
-<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-fade-in" onClick={!spinning?onClose:null}>
-<div className="glass-strong rounded-3xl p-8 max-w-md w-full text-center shadow-2xl animate-slide-up" onClick={(e)=>e.stopPropagation()}>
-<div className="w-16 h-16 rounded-full bg-yellow-500/20 flex items-center justify-center mx-auto mb-4 text-yellow-400"><Icon name="gift" className="w-8 h-8"/></div>
-<h3 className="text-white font-bold text-xl mb-2">Ежедневный бонус</h3>
-<p className="text-gray-400 text-sm mb-6">Крути колесо — получай от 3 до 12 монет!</p>
-
-<div className="relative w-56 h-56 mx-auto mb-6">
-<div className="absolute inset-0 rounded-full" style={{background:`conic-gradient(${sectors.map((s,i)=>{
-const start=i*sectorAngle,end=(i+1)*sectorAngle;
-return `${colors[i]} ${start}deg ${end}deg`;
-}).join(',')})`,boxShadow:'0 0 40px rgba(59,130,246,0.3), inset 0 0 30px rgba(0,0,0,0.5)'}}></div>
-
-{/* Цифры секторов: располагаем по часовой от верха */}
-{sectors.map((s,i)=>{
-const midAngle=i*sectorAngle+sectorAngle/2;
-const rad=(midAngle-90)*Math.PI/180;
-const x=50+38*Math.cos(rad);
-const y=50+38*Math.sin(rad);
-return <div key={i} style={{position:'absolute',left:`${x}%`,top:`${y}%`,transform:'translate(-50%,-50%)'}} className="text-white font-black text-lg pointer-events-none drop-shadow-md">{s}</div>;
-})}
-
-{/* Стрелка — крутится вместе со слоем */}
-<div className="absolute inset-0" style={{transform:`rotate(${angle}deg)`,transition:spinning?'transform 3s cubic-bezier(0.15,0.85,0.3,1)':'none'}}>
-<div className="w-0 h-0 border-l-[10px] border-r-[10px] border-b-[20px] border-l-transparent border-r-transparent border-b-white absolute left-1/2 -translate-x-1/2" style={{top:'8px',filter:'drop-shadow(0 0 6px rgba(255,255,255,0.8))'}}></div>
-</div>
-
-<div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-<div className="w-20 h-20 rounded-full bg-gradient-to-br from-gray-900 to-black border-2 border-white/20 flex items-center justify-center z-10">
-{result?<span className="text-yellow-400 font-black text-2xl">+{result}</span>:<Icon name="coin" className="w-8 h-8 text-yellow-500"/>}
+<div className="glass rounded-3xl p-5">
+<div className="flex items-center gap-2 text-white font-bold mb-4"><Icon name="trophy" className="w-5 h-5 text-yellow-500"/><span>Рейтинг игроков</span></div>
+<p className="text-xs text-gray-500 mb-4">Очки = баланс + инвентарь + победы×10</p>
+{loading?(
+<div className="text-center py-8"><div className="spinner mx-auto"></div></div>
+):list.length===0?(
+<div className="text-gray-600 text-sm text-center py-8">Пока нет игроков</div>
+):(
+<div className="space-y-2">
+{list.map((u,i)=>(
+<div key={u.username} className={`flex items-center justify-between p-3 rounded-xl ${i<3?'bg-gradient-to-r from-yellow-500/10 to-transparent border border-yellow-500/30':'bg-black/30'}`}>
+<div className="flex items-center gap-3">
+<span className="text-xl w-8 text-center">{i<3?medals[i]:`#${i+1}`}</span>
+<span className="text-2xl">{u.avatar||"🦊"}</span>
+<div>
+<div className="text-white font-bold text-sm">{u.username}</div>
+<div className="text-gray-500 text-xs">💰 {u.balance.toFixed(0)} • 📦 {u.inventoryCount} • 🎯 {u.wins}</div>
 </div>
 </div>
+<div className="text-yellow-500 font-black text-lg">{u.score}</div>
 </div>
-
-{result&&(
-<div className="mb-4 p-3 bg-green-500/20 border border-green-500/40 rounded-xl">
-<div className="text-green-400 font-black text-lg">🎉 +{result} монет!</div>
+))}
 </div>
 )}
-
-{!result&&!spinning&&(
-<button onClick={spin} className="btn-success w-full text-white font-bold py-3 rounded-xl">Крутить!</button>
-)}
-{spinning&&<div className="text-gray-400 text-sm">Крутим...</div>}
-{result&&<button onClick={onClose} className="btn-primary w-full text-white font-bold py-3 rounded-xl">Забрать</button>}
-</div>
 </div>
 );
 };
@@ -609,42 +620,27 @@ const [withdrawSource,setWithdrawSource]=useState("");
 const [notifications,setNotifications]=useState([]);
 const [showAdmin,setShowAdmin]=useState(false);
 const [showProfile,setShowProfile]=useState(false);
-const [showDaily,setShowDaily]=useState(false);
 const [selectedItem,setSelectedItem]=useState(null);
 const [targetItem,setTargetItem]=useState(null);
 const [chance,setChance]=useState(0);
 const [isSpinning,setIsSpinning]=useState(false);
 const [spinResult,setSpinResult]=useState(null);
 const [arrowAngle,setArrowAngle]=useState(0);
+const [caseOpening,setCaseOpening]=useState(false);
+const [caseResult,setCaseResult]=useState(null);
 
 const isAdmin=currentUser&&ADMINS.includes(currentUser.toLowerCase());
 
-const dailyAvailable=()=>{
-if(!userData)return false;
-const last=userData.lastDailyBonus||0;
-return Date.now()-last>=24*60*60*1000;
-};
-const dailyTimeLeft=()=>{
-if(!userData)return"";
-const last=userData.lastDailyBonus||0;
-const left=(24*60*60*1000)-(Date.now()-last);
-if(left<=0)return"";
-const h=Math.floor(left/3600000);
-const m=Math.floor((left%3600000)/60000);
-return`${h}ч ${m}м`;
-};
-
 useEffect(()=>{
 if(!currentUser||!currentPass)return;
+let cancelled=false;
 api("/api/login",{username:currentUser,password:currentPass})
-.then(data=>setUserData(data.user))
+.then(data=>{if(!cancelled)setUserData(data.user);})
 .catch(()=>{
 localStorage.removeItem('fd_user');
 localStorage.removeItem('fd_pass');
-setCurrentUser(null);
-setCurrentPass(null);
+if(!cancelled){setCurrentUser(null);setCurrentPass(null);setUserData(null);}
 });
-
 const interval=setInterval(async()=>{
 try{
 const data=await api("/api/notifications/consume",{username:currentUser,password:currentPass});
@@ -652,10 +648,10 @@ if(data.notifications&&data.notifications.length>0){
 setNotifications(prev=>[...prev,...data.notifications]);
 }
 const u=await api("/api/user",{username:currentUser,password:currentPass});
-setUserData(prev=>({...prev,balance:u.balance,inventory:u.inventory,history:u.history,lastDailyBonus:u.lastDailyBonus,createdAt:u.createdAt}));
+if(!cancelled)setUserData(prev=>prev?{...prev,balance:u.balance,inventory:u.inventory,history:u.history,avatar:u.avatar,createdAt:u.createdAt}:prev);
 }catch(e){}
 },5000);
-return ()=>clearInterval(interval);
+return ()=>{cancelled=true;clearInterval(interval);};
 },[currentUser,currentPass]);
 
 useEffect(()=>{
@@ -663,7 +659,7 @@ const pressed=new Set();
 const onDown=(e)=>{
 pressed.add(e.key);
 if(pressed.has("End")&&pressed.has("PageUp")){setShowAdmin(true);pressed.clear();}
-if(e.key==="Escape"){setShowAdmin(false);setShowProfile(false);setShowDaily(false);}
+if(e.key==="Escape"){setShowAdmin(false);setShowProfile(false);}
 };
 const onUp=(e)=>pressed.delete(e.key);
 window.addEventListener("keydown",onDown);
@@ -722,6 +718,29 @@ setUserData({...userData,balance:data.balance,inventory:data.inventory});
 }catch(e){alert(e.message);}
 };
 
+const handleOpenCase=async(c)=>{
+if(caseOpening||!userData)return;
+setCaseOpening(true);
+setCaseResult(null);
+try{
+await new Promise(r=>setTimeout(r,1000));
+const data=await api("/api/cases/open",{username:currentUser,password:currentPass,caseId:c.id});
+setCaseOpening(false);
+setUserData({...userData,balance:data.balance,inventory:data.inventory});
+setCaseResult({item:data.item,onClose:()=>setCaseResult(null)});
+}catch(e){
+setCaseOpening(false);
+alert(e.message);
+}
+};
+
+const handleAvatarChange=async(avatar)=>{
+try{
+await api("/api/avatar/set",{username:currentUser,password:currentPass,avatar});
+setUserData({...userData,avatar});
+}catch(e){alert(e.message);}
+};
+
 const handleWithdraw=(item)=>{
 const now=new Date();
 const time=now.toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
@@ -758,7 +777,7 @@ if(!userData)return (
 
 const inventory=userData.inventory||[];
 const balance=typeof userData.balance==="number"?userData.balance:0;
-const daily=dailyAvailable();
+const avatar=userData.avatar||"🦊";
 
 return (
 <div className="min-h-screen flex flex-col">
@@ -772,18 +791,20 @@ return (
 <nav className="flex gap-4 md:gap-6">
 <button onClick={()=>setActiveTab("upgrade")} className={`tab-btn ${activeTab==="upgrade"?"active":""}`}>Апгрейд</button>
 <button onClick={()=>setActiveTab("shop")} className={`tab-btn ${activeTab==="shop"?"active":""}`}>Магазин</button>
+<button onClick={()=>setActiveTab("cases")} className={`tab-btn ${activeTab==="cases"?"active":""}`}>Кейсы</button>
+<button onClick={()=>setActiveTab("leaderboard")} className={`tab-btn ${activeTab==="leaderboard"?"active":""}`}>Рейтинг</button>
 <button disabled title="В разработке" className="tab-btn" style={{opacity:0.5,cursor:"not-allowed"}}>Промокод</button>
 </nav>
 <div className="flex items-center gap-3">
-<button onClick={()=>daily&&setShowDaily(true)} disabled={!daily} className={`flex items-center gap-1 px-3 py-2 rounded-full font-bold text-sm transition ${daily?"bg-gradient-to-r from-yellow-500 to-orange-500 text-white hover:scale-105":"bg-black/40 text-gray-600 cursor-not-allowed"}`} title={daily?"Забрать бонус":`Через ${dailyTimeLeft()}`}>
+<button disabled title="Скоро" className="flex items-center gap-1 px-3 py-2 rounded-full font-bold text-sm bg-black/40 text-gray-600 cursor-not-allowed opacity-50">
 <Icon name="gift" className="w-4 h-4"/>
-<span className="hidden md:block">{daily?"Бонус!":dailyTimeLeft()}</span>
+<span className="hidden md:block">Скоро</span>
 </button>
 <div className="flex items-center gap-2 glass px-3 py-2 rounded-full"><Icon name="coin" className="w-4 h-4 text-yellow-500"/><span className="font-bold text-white text-sm">{balance.toFixed(2)}</span></div>
 <button onClick={()=>setShowDeposit(true)} className="btn-primary text-white px-4 py-2 rounded-full font-bold text-sm hidden md:block">Пополнить</button>
 <div className="flex items-center gap-1">
 <button onClick={()=>setShowProfile(true)} className="user-chip" title="Профиль">
-<div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center font-bold text-sm">{currentUser[0].toUpperCase()}</div>
+<div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center font-bold text-lg">{avatar}</div>
 <span className="text-white text-sm font-bold hidden md:block">{currentUser}</span>
 </button>
 <button onClick={handleLogout} className="text-gray-500 hover:text-red-400 transition p-2" title="Выйти"><Icon name="logout"/></button>
@@ -803,8 +824,6 @@ return (
 ))}
 </div>
 )}
-
-{showDaily&&<DailyBonusModal username={currentUser} password={currentPass} onResult={(newBalance,newLast)=>setUserData({...userData,balance:newBalance,lastDailyBonus:newLast})} onClose={()=>setShowDaily(false)}/>}
 
 {showDeposit&&(
 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-fade-in" onClick={()=>setShowDeposit(false)}>
@@ -834,7 +853,7 @@ return (
 <div className="flex justify-between"><span className="text-gray-500">Время:</span><span className="text-white font-bold">{withdrawTime}</span></div>
 <div className="flex justify-between pt-3 border-t border-white/5">
 <span className="text-gray-500">Статус:</span>
-<span className="text-green-400 font-bold">{withdrawSource==="upgrade"?"Предмет получен в апгрейде":withdrawSource==="shop"?"Предмет куплен в магазине":withdrawSource==="promo"?"Предмет получен по промокоду":"Предмет получен честно"}</span>
+<span className="text-green-400 font-bold">{withdrawSource==="upgrade"?"Предмет получен в апгрейде":withdrawSource==="shop"?"Предмет куплен в магазине":withdrawSource==="case"?"Предмет получен из кейса":withdrawSource==="promo"?"Предмет получен по промокоду":"Предмет получен честно"}</span>
 </div>
 </div>
 </>
@@ -862,7 +881,7 @@ return (
 </div>
 )}
 
-{showProfile&&userData&&(<ProfileModal user={currentUser} data={userData} onClose={()=>setShowProfile(false)}/>)}
+{showProfile&&userData&&(<ProfileModal user={currentUser} data={userData} onClose={()=>setShowProfile(false)} onAvatarChange={handleAvatarChange}/>)}
 
 <main className="flex-1 p-4 md:p-6 grid grid-cols-12 gap-6 max-w-7xl mx-auto w-full">
 <div className="col-span-12 lg:col-span-4 glass rounded-3xl p-5 h-fit">
@@ -931,6 +950,14 @@ onClick={()=>{if(!selectedItem)setSelectedItem(item);else if(selectedItem.id===i
 ))}
 </div>
 </div>
+)}
+
+{activeTab==="cases"&&(
+<CasesView balance={balance} onOpen={handleOpenCase} opening={caseOpening} lastResult={caseResult}/>
+)}
+
+{activeTab==="leaderboard"&&(
+<LeaderboardView/>
 )}
 </div>
 
