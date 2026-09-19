@@ -782,18 +782,15 @@ setUserData({...userData,balance:data.balance,inventory:data.inventory});
 };
 
 const handleOpenCase=async(c)=>{
-if(caseOpening||!userData)return;
-setCaseOpening(true);
-setCaseResult(null);
+if(!userData)return null;
+if(userData.balance<c.price){alert("Недостаточно монет!");return null;}
 try{
-await new Promise(r=>setTimeout(r,1000));
 const data=await api("/api/cases/open",{username:currentUser,password:currentPass,caseId:c.id});
-setCaseOpening(false);
 setUserData({...userData,balance:data.balance,inventory:data.inventory});
-setCaseResult({item:data.item,onClose:()=>setCaseResult(null)});
+return {item:data.item};
 }catch(e){
-setCaseOpening(false);
 alert(e.message);
+return null;
 }
 };
 
