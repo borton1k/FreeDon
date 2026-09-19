@@ -34,9 +34,10 @@ body{background:radial-gradient(circle at 20% 0%,rgba(59,130,246,0.15),transpare
 .btn-danger{background:linear-gradient(135deg,#ef4444,#dc2626);transition:all 0.2s}
 .btn-danger:hover:not(:disabled){background:linear-gradient(135deg,#dc2626,#b91c1c);transform:translateY(-1px)}
 .tab-btn{position:relative;padding:8px 4px;font-weight:600;font-size:14px;color:#6b7280;transition:color 0.2s;border:none;background:none;cursor:pointer}
-.tab-btn:hover{color:#9ca3af}
+.tab-btn:hover:not(:disabled){color:#9ca3af}
 .tab-btn.active{color:#fff}
 .tab-btn.active::after{content:'';position:absolute;bottom:-4px;left:0;right:0;height:2px;background:linear-gradient(90deg,#3b82f6,#8b5cf6);border-radius:2px}
+.tab-btn:disabled{cursor:not-allowed;opacity:0.5}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 @keyframes slideInRight{from{opacity:0;transform:translateX(100px)}to{opacity:1;transform:translateX(0)}}
@@ -368,7 +369,6 @@ setMessage({type:"success",text:`Промокод ${code} удалён`});
 }catch(e){setMessage({type:"error",text:e.message});}
 };
 
-const luckLabels={random:"🎲 Случайно",win:"✅ Всегда победа",lose:"❌ Всегда проигрыш"};
 const daysLeft=(exp)=>{
 const d=Math.ceil((exp-Date.now())/86400000);
 return d>0?`${d} дн.`:'истёк';
@@ -528,8 +528,18 @@ setResult(null);
 try{
 const data=await api("/api/daily-bonus",{username,password});
 const reward=data.reward;
-const sectorIdx=sectors.indexOf(reward);
-const targetAngle=1080+(360-sectorIdx*sectorAngle-sectorAngle/2);
+
+const possibleIdxs=[];
+for(let i=0;i<sectors.length;i++){
+if(sectors[i]===reward)possibleIdxs.push(i);
+}
+const sectorIdx=possibleIdxs[Math.floor(Math.random()*possibleIdxs.length)];
+
+const sectorStart=sectorIdx*sectorAngle;
+const padding=sectorAngle*0.15;
+const randomStop=sectorStart+padding+Math.random()*(sectorAngle-2*padding);
+const targetAngle=1080+(360-randomStop);
+
 setAngle(targetAngle);
 setTimeout(()=>{
 setResult(reward);
@@ -609,9 +619,6 @@ const [chance,setChance]=useState(0);
 const [isSpinning,setIsSpinning]=useState(false);
 const [spinResult,setSpinResult]=useState(null);
 const [arrowAngle,setArrowAngle]=useState(0);
-const [promoCode,setPromoCode]=useState("");
-const [promoMessage,setPromoMessage]=useState(null);
-const [promoLoading,setPromoLoading]=useState(false);
 
 const isAdmin=currentUser&&ADMINS.includes(currentUser.toLowerCase());
 
@@ -627,7 +634,6 @@ const left=(24*60*60*1000)-(Date.now()-last);
 if(left<=0)return"";
 const h=Math.floor(left/3600000);
 const m=Math.floor((left%3600000)/60000);
-const s=Math.floor((left%60000)/1000);
 return`${h}ч ${m}м`;
 };
 
@@ -677,7 +683,7 @@ setSpinResult(null);
 setArrowAngle(0);
 setTimeout(async()=>{
 try{
-const data=await api("/api/upgrade",{username:currentUser,password:currentPass,fromItemId:selectedItem.id,toItemId:targetItem.id,items:ITEMS});
+const data=await api("/api/upgrade",{username:currentUser,password:currentPass,fromItemId:selectedItem.id,toItemId:targetItem.id});
 const zoneAngle=chance*3.6;
 let stopAngle;
 if(data.win){
@@ -719,21 +725,6 @@ setWithdrawLegit(item.legit===true);
 setWithdrawSource(item.source||"");
 };
 
-const handleActivatePromo=async()=>{
-if(!promoCode.trim())return setPromoMessage({type:"error",text:"Введите промокод"});
-setPromoLoading(true);
-setPromoMessage(null);
-try{
-const data=await api("/api/promo/activate",{username:currentUser,password:currentPass,code:promoCode});
-setPromoMessage({type:"success",text:`Промокод активирован! Вы получили: ${data.rewardText}`});
-setUserData({...userData,balance:data.balance,inventory:data.inventory});
-setPromoCode("");
-}catch(e){
-setPromoMessage({type:"error",text:e.message});
-}
-setPromoLoading(false);
-};
-
 const handleLogout=()=>{setCurrentUser(null);setCurrentPass(null);setUserData(null);};
 
 if(!currentUser||!userData)return <AuthScreen onAuth={(u,p,data)=>{setCurrentUser(u);setCurrentPass(p);setUserData(data);}}/>;
@@ -754,7 +745,7 @@ return (
 <nav className="flex gap-4 md:gap-6">
 <button onClick={()=>setActiveTab("upgrade")} className={`tab-btn ${activeTab==="upgrade"?"active":""}`}>Апгрейд</button>
 <button onClick={()=>setActiveTab("shop")} className={`tab-btn ${activeTab==="shop"?"active":""}`}>Магазин</button>
-<button onClick={()=>setActiveTab("promo")} className={`tab-btn ${activeTab==="promo"?"active":""}`}>Промокод</button>
+<button disabled title="В разработке" className="tab-btn" style={{opacity:0.5,cursor:"not-allowed"}}>Промокод</button>
 </nav>
 <div className="flex items-center gap-3">
 <button onClick={()=>daily&&setShowDaily(true)} disabled={!daily} className={`flex items-center gap-1 px-3 py-2 rounded-full font-bold text-sm transition ${daily?"bg-gradient-to-r from-yellow-500 to-orange-500 text-white hover:scale-105":"bg-black/40 text-gray-600 cursor-not-allowed"}`} title={daily?"Забрать бонус":`Через ${dailyTimeLeft()}`}>
@@ -912,17 +903,6 @@ onClick={()=>{if(!selectedItem)setSelectedItem(item);else if(selectedItem.id===i
 </div>
 ))}
 </div>
-</div>
-)}
-
-{activeTab==="promo"&&(
-<div className="glass rounded-3xl p-6 max-w-md mx-auto w-full">
-<div className="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center mx-auto mb-4 text-purple-400"><Icon name="promo" className="w-8 h-8"/></div>
-<h3 className="text-white font-bold text-xl text-center mb-2">Активация промокода</h3>
-<p className="text-gray-400 text-sm text-center mb-6">Введите код и получите награду</p>
-<input type="text" value={promoCode} onChange={(e)=>setPromoCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,''))} className="w-full bg-black/40 border border-white/10 focus:border-purple-500 text-white px-4 py-4 rounded-xl outline-none text-center font-black text-xl tracking-widest" placeholder="FD000000" maxLength={8} />
-{promoMessage&&<div className={`mt-4 p-3 rounded-xl text-sm text-center font-bold border ${promoMessage.type==="success"?'bg-green-500/10 text-green-400 border-green-500/20':'bg-red-500/10 text-red-400 border-red-500/20'}`}>{promoMessage.text}</div>}
-<button onClick={handleActivatePromo} disabled={promoLoading||!promoCode.trim()} className="btn-primary w-full text-white font-bold py-3 rounded-xl mt-4">{promoLoading?'Активация...':'Активировать'}</button>
 </div>
 )}
 </div>
