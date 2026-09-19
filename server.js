@@ -1,298 +1,301 @@
-const express = require('express');
-const cors = require('cors');
-const bcrypt = require('bcryptjs');
-const fs = require('fs');
-const path = require('path');
+const express=require('express');const cors=require('cors');const bcrypt=require('bcryptjs');const fs=require('fs');const path=require('path');
+const app=express();const PORT=process.env.PORT||3000;const DB_FILE=path.join(__dirname,'db.json');
+const ADMINS=["akaidzu"];
+function loadDB(){try{const raw=fs.readFileSync(DB_FILE,'utf8');const d=JSON.parse(raw);if(!d.users)d.users={};if(!d.promocodes)d.promocodes={};return d;}catch(e){return{users:{},promocodes:{}};}}
+function saveDB(db){fs.writeFileSync(DB_FILE,JSON.stringify(db,null,2),'utf8');}
+function genTicket(){let id='';for(let i=0;i<8;i++)id+=Math.floor(Math.random()*10);return id;}
+function genPromo(){let c='FD';for(let i=0;i<6;i++)c+=Math.floor(Math.random()*10);return c;}
+app.use(cors());app.use(express.json({limit:'1mb'}));
+app.get('/',(req,res)=>{res.sendFile(path.join(__dirname,'index.html'));});
 
-const app = express();
-const PORT = process.env.PORT || 3000;
-const DB_FILE = path.join(__dirname, 'db.json');
+app.post('/api/register',async(req,res)=>{
+try{
+const{username,password}=req.body;
+if(!username||!password)return res.status(400).json({error:'Логин и пароль обязательны'});
+if(!/^[a-zA-Z0-9_]{3,16}$/.test(username))return res.status(400).json({error:'Ник: 3–16 символов, латиница, цифры, _'});
+if(password.length<4)return res.status(400).json({error:'Пароль минимум 4 символа'});
+const db=loadDB();
+if(db.users[username])return res.status(400).json({error:'Такой ник уже занят'});
+const hash=await bcrypt.hash(password,10);
+db.users[username]={hash,balance:0,inventory:[],history:[],notifications:[],lastDailyBonus:0,usedPromocodes:[],luckMode:"random",createdAt:Date.now()};
+saveDB(db);res.json({ok:true});
+}catch(e){console.error(e);res.status(500).json({error:'Ошибка сервера'});}
+});
 
-// ---- Утилиты ----
-function loadDB() {
-  try {
-    const raw = fs.readFileSync(DB_FILE, 'utf8');
-    return JSON.parse(raw);
-  } catch (e) {
-    return { users: {} };
-  }
+app.post('/api/login',async(req,res)=>{
+try{
+const{username,password}=req.body;
+if(!username||!password)return res.status(400).json({error:'Логин и пароль обязательны'});
+const db=loadDB();const user=db.users[username];
+if(!user)return res.status(400).json({error:'Игрок не найден'});
+const ok=await bcrypt.compare(password,user.hash);
+if(!ok)return res.status(400).json({error:'Неверный пароль'});
+res.json({ok:true,user:{username,balance:user.balance,inventory:user.inventory,history:user.history,notifications:user.notifications||[],lastDailyBonus:user.lastDailyBonus||0,createdAt:user.createdAt}});
+}catch(e){res.status(500).json({error:'Ошибка сервера'});}
+});
+
+app.post('/api/user',(req,res)=>{
+try{
+const{username,password}=req.body;
+const db=loadDB();const user=db.users[username];
+if(!user)return res.status(404).json({error:'Игрок не найден'});
+bcrypt.compare(password||'',user.hash).then(ok=>{
+if(!ok)return res.status(403).json({error:'Неверный пароль'});
+res.json({balance:user.balance,inventory:user.inventory,history:user.history,notifications:user.notifications||[],lastDailyBonus:user.lastDailyBonus||0,createdAt:user.createdAt});
+});
+}catch(e){res.status(500).json({error:'Ошибка'});}
+});
+
+app.post('/api/notifications/consume',(req,res)=>{
+try{
+const{username,password}=req.body;
+const db=loadDB();const user=db.users[username];
+if(!user)return res.status(404).json({error:'Не найден'});
+bcrypt.compare(password||'',user.hash).then(ok=>{
+if(!ok)return res.status(403).json({error:'Неверный пароль'});
+const notes=user.notifications||[];
+user.notifications=[];
+saveDB(db);
+res.json({notifications:notes});
+});
+}catch(e){res.status(500).json({error:'Ошибка'});}
+});
+
+app.post('/api/upgrade',(req,res)=>{
+try{
+const{username,password,fromItemId,toItemId,items}=req.body;
+if(!username||!password)return res.status(400).json({error:'Не авторизован'});
+const db=loadDB();const user=db.users[username];
+if(!user)return res.status(404).json({error:'Не найден'});
+bcrypt.compare(password,user.hash).then(ok=>{
+if(!ok)return res.status(403).json({error:'Неверный пароль'});
+const fromItem=items.find(i=>i.id===fromItemId);
+const toItem=items.find(i=>i.id===toItemId);
+if(!fromItem||!toItem)return res.status(400).json({error:'Предмет не найден'});
+const idx=user.inventory.findIndex(i=>i.id===fromItemId);
+if(idx===-1)return res.status(400).json({error:'У вас нет этого предмета в инвентаре'});
+let chance=(fromItem.price/toItem.price)*100;
+if(chance>90)chance=90;
+let isWin;
+if(user.luckMode==="win")isWin=true;
+else if(user.luckMode==="lose")isWin=false;
+else isWin=Math.random()*100<=chance;
+user.inventory.splice(idx,1);
+if(isWin){user.inventory.push({...toItem,legit:true,source:'upgrade',obtainedAt:Date.now(),ticketId:genTicket()});}
+user.history.unshift({id:Date.now(),from:fromItem.name,to:toItem.name,chance:parseFloat(chance.toFixed(2)),win:isWin,time:new Date().toLocaleTimeString().slice(0,5)});
+if(user.history.length>50)user.history=user.history.slice(0,50);
+saveDB(db);
+res.json({ok:true,win:isWin,chance:parseFloat(chance.toFixed(2)),balance:user.balance,inventory:user.inventory,history:user.history});
+});
+}catch(e){console.error(e);res.status(500).json({error:'Ошибка сервера'});}
+});
+
+app.post('/api/buy',(req,res)=>{
+try{
+const{username,password,item}=req.body;
+if(!username||!password||!item)return res.status(400).json({error:'Нет данных'});
+const db=loadDB();const user=db.users[username];
+if(!user)return res.status(404).json({error:'Не найден'});
+bcrypt.compare(password,user.hash).then(ok=>{
+if(!ok)return res.status(403).json({error:'Неверный пароль'});
+if(user.balance<item.price)return res.status(400).json({error:'Недостаточно монет'});
+user.balance-=item.price;
+user.inventory.push({...item,legit:true,source:'shop',obtainedAt:Date.now(),ticketId:genTicket()});
+saveDB(db);
+res.json({ok:true,balance:user.balance,inventory:user.inventory});
+});
+}catch(e){res.status(500).json({error:'Ошибка'});}
+});
+
+app.post('/api/daily-bonus',(req,res)=>{
+try{
+const{username,password}=req.body;
+if(!username||!password)return res.status(400).json({error:'Не авторизован'});
+const db=loadDB();const user=db.users[username];
+if(!user)return res.status(404).json({error:'Не найден'});
+bcrypt.compare(password,user.hash).then(ok=>{
+if(!ok)return res.status(403).json({error:'Неверный пароль'});
+const now=Date.now();
+const last=user.lastDailyBonus||0;
+const cooldown=24*60*60*1000;
+const elapsed=now-last;
+if(elapsed<cooldown){return res.status(400).json({error:'Бонус ещё недоступен',remaining:cooldown-elapsed});}
+const sectors=[3,5,7,9,12,5];
+const reward=sectors[Math.floor(Math.random()*sectors.length)];
+user.balance+=reward;
+user.lastDailyBonus=now;
+if(!user.notifications)user.notifications=[];
+user.notifications.push(`Ежедневный бонус: +${reward} монет!`);
+saveDB(db);
+res.json({ok:true,reward,balance:user.balance,lastDailyBonus:user.lastDailyBonus});
+});
+}catch(e){console.error(e);res.status(500).json({error:'Ошибка сервера'});}
+});
+
+app.post('/api/promo/create',(req,res)=>{
+try{
+const{adminUser,adminPass,type,amount,itemId,itemCount,limit}=req.body;
+if(!ADMINS.includes(adminUser))return res.status(403).json({error:'Нет прав'});
+const db=loadDB();const admin=db.users[adminUser];
+if(!admin)return res.status(404).json({error:'Админ не найден'});
+bcrypt.compare(adminPass,admin.hash).then(ok=>{
+if(!ok)return res.status(403).json({error:'Неверный пароль'});
+if(type!=='money'&&type!=='item')return res.status(400).json({error:'Неверный тип'});
+let code=genPromo();
+while(db.promocodes[code])code=genPromo();
+const lim=Math.max(1,Math.min(1000,parseInt(limit)||1));
+const promo={code,type,limit:lim,used:0,createdAt:Date.now(),expiresAt:Date.now()+14*24*60*60*1000,activations:{}};
+if(type==='money'){
+const amt=Math.max(1,Math.min(10000,parseInt(amount)||1));
+promo.amount=amt;
+}else{
+const cnt=Math.max(1,Math.min(10,parseInt(itemCount)||1));
+promo.itemId=parseInt(itemId);
+promo.itemCount=cnt;
 }
+db.promocodes[code]=promo;
+saveDB(db);
+res.json({ok:true,code,promo});
+});
+}catch(e){console.error(e);res.status(500).json({error:'Ошибка сервера'});}
+});
 
-function saveDB(db) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf8');
+app.post('/api/promo/activate',(req,res)=>{
+try{
+const{username,password,code}=req.body;
+if(!username||!password||!code)return res.status(400).json({error:'Нет данных'});
+const db=loadDB();const user=db.users[username];
+if(!user)return res.status(404).json({error:'Не найден'});
+bcrypt.compare(password,user.hash).then(ok=>{
+if(!ok)return res.status(403).json({error:'Неверный пароль'});
+const cleanCode=(code||'').trim().toUpperCase();
+const promo=db.promocodes[cleanCode];
+if(!promo)return res.status(400).json({error:'Такого промокода не существует'});
+if(promo.expiresAt<Date.now())return res.status(400).json({error:'Промокод истёк'});
+if(promo.used>=promo.limit)return res.status(400).json({error:'Лимит активаций исчерпан'});
+if(!Array.isArray(user.usedPromocodes))user.usedPromocodes=[];
+if(user.usedPromocodes.includes(cleanCode))return res.status(400).json({error:'Вы уже активировали этот промокод'});
+if(!promo.activations)promo.activations={};
+promo.activations[username]=Date.now();
+promo.used+=1;
+user.usedPromocodes.push(cleanCode);
+let rewardText='';
+if(promo.type==='money'){
+user.balance+=promo.amount;
+rewardText=`+${promo.amount} монет`;
+user.notifications.push(`Промокод ${cleanCode} активирован: +${promo.amount} монет`);
+}else{
+const it=ITEMS.find(x=>x.id===promo.itemId);
+if(!it)return res.status(400).json({error:'Предмет промокода не найден'});
+for(let i=0;i<promo.itemCount;i++){
+user.inventory.push({...it,legit:true,source:'promo',obtainedAt:Date.now(),ticketId:genTicket()});
 }
-
-function generateTicketId() {
-  let id = '';
-  for (let i = 0; i < 8; i++) id += Math.floor(Math.random() * 10);
-  return id;
+rewardText=`${it.name} × ${promo.itemCount}`;
+user.notifications.push(`Промокод ${cleanCode} активирован: ${it.name} × ${promo.itemCount}`);
 }
-
-// ---- Middleware ----
-app.use(cors());
-app.use(express.json({ limit: '1mb' }));
-
-// Главная — отдаём index.html
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
+saveDB(db);
+res.json({ok:true,rewardText,balance:user.balance,inventory:user.inventory});
+});
+}catch(e){console.error(e);res.status(500).json({error:'Ошибка сервера'});}
 });
 
-// ---- API: регистрация ----
-app.post('/api/register', async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    if (!username || !password) return res.status(400).json({ error: 'Логин и пароль обязательны' });
-    if (!/^[a-zA-Z0-9_]{3,16}$/.test(username)) return res.status(400).json({ error: 'Ник: 3–16 символов, латиница, цифры, _' });
-    if (password.length < 4) return res.status(400).json({ error: 'Пароль минимум 4 символа' });
-
-    const db = loadDB();
-    if (db.users[username]) return res.status(400).json({ error: 'Такой ник уже занят' });
-
-    const hash = await bcrypt.hash(password, 10);
-    db.users[username] = {
-      hash,
-      balance: 0,
-      inventory: [],
-      history: [],
-      notifications: [],
-      createdAt: Date.now()
-    };
-    saveDB(db);
-    res.json({ ok: true });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'Ошибка сервера' });
-  }
+app.post('/api/promo/list',(req,res)=>{
+try{
+const{adminUser,adminPass}=req.body;
+if(!ADMINS.includes(adminUser))return res.status(403).json({error:'Нет прав'});
+const db=loadDB();const admin=db.users[adminUser];
+if(!admin)return res.status(404).json({error:'Админ не найден'});
+bcrypt.compare(adminPass,admin.hash).then(ok=>{
+if(!ok)return res.status(403).json({error:'Неверный пароль'});
+const list=Object.values(db.promocodes).map(p=>{
+let itemName=null;
+if(p.type==='item'){
+const it=ITEMS.find(x=>x.id===p.itemId);
+itemName=it?it.name:'?';
+}
+return{code:p.code,type:p.type,amount:p.amount||null,itemName,itemCount:p.itemCount||null,used:p.used,limit:p.limit,expiresAt:p.expiresAt,createdAt:p.createdAt};
+});
+res.json({promocodes:list});
+});
+}catch(e){res.status(500).json({error:'Ошибка'});}
 });
 
-// ---- API: вход ----
-app.post('/api/login', async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    if (!username || !password) return res.status(400).json({ error: 'Логин и пароль обязательны' });
-
-    const db = loadDB();
-    const user = db.users[username];
-    if (!user) return res.status(400).json({ error: 'Игрок не найден' });
-
-    const ok = await bcrypt.compare(password, user.hash);
-    if (!ok) return res.status(400).json({ error: 'Неверный пароль' });
-
-    res.json({
-      ok: true,
-      user: {
-        username,
-        balance: user.balance,
-        inventory: user.inventory,
-        history: user.history,
-        notifications: user.notifications || [],
-        createdAt: user.createdAt
-      }
-    });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'Ошибка сервера' });
-  }
+app.post('/api/promo/delete',(req,res)=>{
+try{
+const{adminUser,adminPass,code}=req.body;
+if(!ADMINS.includes(adminUser))return res.status(403).json({error:'Нет прав'});
+const db=loadDB();const admin=db.users[adminUser];
+if(!admin)return res.status(404).json({error:'Админ не найден'});
+bcrypt.compare(adminPass,admin.hash).then(ok=>{
+if(!ok)return res.status(403).json({error:'Неверный пароль'});
+if(!db.promocodes[code])return res.status(404).json({error:'Промокод не найден'});
+delete db.promocodes[code];
+saveDB(db);
+res.json({ok:true});
+});
+}catch(e){res.status(500).json({error:'Ошибка'});}
 });
 
-// ---- API: получить данные пользователя ----
-app.post('/api/user', (req, res) => {
-  try {
-    const { username, password } = req.body;
-    const db = loadDB();
-    const user = db.users[username];
-    if (!user) return res.status(404).json({ error: 'Игрок не найден' });
-
-    // Простая проверка пароля для этого запроса
-    bcrypt.compare(password || '', user.hash).then(ok => {
-      if (!ok) return res.status(403).json({ error: 'Неверный пароль' });
-      res.json({
-        balance: user.balance,
-        inventory: user.inventory,
-        history: user.history,
-        notifications: user.notifications || [],
-        createdAt: user.createdAt
-      });
-    });
-  } catch (e) {
-    res.status(500).json({ error: 'Ошибка сервера' });
-  }
+app.post('/api/admin/grant',(req,res)=>{
+try{
+const{adminUser,adminPass,targetUser,amount}=req.body;
+if(!ADMINS.includes(adminUser))return res.status(403).json({error:'Нет прав'});
+const db=loadDB();const admin=db.users[adminUser];
+if(!admin)return res.status(404).json({error:'Админ не найден'});
+bcrypt.compare(adminPass,admin.hash).then(ok=>{
+if(!ok)return res.status(403).json({error:'Неверный пароль админа'});
+const target=db.users[targetUser];
+if(!target)return res.status(404).json({error:`Игрок "${targetUser}" не найден`});
+const sum=Number(amount);
+if(!sum||isNaN(sum))return res.status(400).json({error:'Неверная сумма'});
+if(target.balance+sum<0)return res.status(400).json({error:'Баланс не может быть отрицательным'});
+target.balance+=sum;
+if(sum>0){
+if(!target.notifications)target.notifications=[];
+target.notifications.push(`Администратор выдал вам ${sum} монет!`);
+}
+saveDB(db);
+res.json({ok:true,text:`${targetUser}: ${sum>0?'начислено':'списано'} ${Math.abs(sum)} монет`});
+});
+}catch(e){res.status(500).json({error:'Ошибка'});}
 });
 
-// ---- API: получить уведомления и очистить ----
-app.post('/api/notifications/consume', (req, res) => {
-  try {
-    const { username, password } = req.body;
-    const db = loadDB();
-    const user = db.users[username];
-    if (!user) return res.status(404).json({ error: 'Не найден' });
-
-    bcrypt.compare(password || '', user.hash).then(ok => {
-      if (!ok) return res.status(403).json({ error: 'Неверный пароль' });
-      const notes = user.notifications || [];
-      user.notifications = [];
-      saveDB(db);
-      res.json({ notifications: notes });
-    });
-  } catch (e) {
-    res.status(500).json({ error: 'Ошибка' });
-  }
+app.post('/api/admin/luck',(req,res)=>{
+try{
+const{adminUser,adminPass,targetUser,mode}=req.body;
+if(!ADMINS.includes(adminUser))return res.status(403).json({error:'Нет прав'});
+if(!['random','win','lose'].includes(mode))return res.status(400).json({error:'Неверный режим'});
+const db=loadDB();const admin=db.users[adminUser];
+if(!admin)return res.status(404).json({error:'Админ не найден'});
+bcrypt.compare(adminPass,admin.hash).then(ok=>{
+if(!ok)return res.status(403).json({error:'Неверный пароль'});
+const target=db.users[targetUser];
+if(!target)return res.status(404).json({error:'Игрок не найден'});
+target.luckMode=mode;
+saveDB(db);
+const labels={random:'случайно',win:'всегда победа',lose:'всегда проигрыш'};
+res.json({ok:true,text:`${targetUser}: режим "${labels[mode]}"`});
+});
+}catch(e){res.status(500).json({error:'Ошибка'});}
 });
 
-// ---- API: апгрейд (вся логика на сервере) ----
-app.post('/api/upgrade', (req, res) => {
-  try {
-    const { username, password, fromItemId, toItemId, items } = req.body;
-    if (!username || !password) return res.status(400).json({ error: 'Не авторизован' });
-
-    const db = loadDB();
-    const user = db.users[username];
-    if (!user) return res.status(404).json({ error: 'Не найден' });
-
-    bcrypt.compare(password, user.hash).then(ok => {
-      if (!ok) return res.status(403).json({ error: 'Неверный пароль' });
-
-      const fromItem = items.find(i => i.id === fromItemId);
-      const toItem = items.find(i => i.id === toItemId);
-      if (!fromItem || !toItem) return res.status(400).json({ error: 'Предмет не найден' });
-
-      const idx = user.inventory.findIndex(i => i.id === fromItemId);
-      if (idx === -1) return res.status(400).json({ error: 'У вас нет этого предмета в инвентаре' });
-
-      let chance = (fromItem.price / toItem.price) * 100;
-      if (chance > 90) chance = 90;
-
-      const isWin = Math.random() * 100 <= chance;
-
-      user.inventory.splice(idx, 1);
-      if (isWin) {
-        user.inventory.push({
-          ...toItem,
-          legit: true,
-          source: 'upgrade',
-          obtainedAt: Date.now(),
-          ticketId: generateTicketId()
-        });
-      }
-
-      user.history.unshift({
-        id: Date.now(),
-        from: fromItem.name,
-        to: toItem.name,
-        chance: parseFloat(chance.toFixed(2)),
-        win: isWin,
-        time: new Date().toLocaleTimeString().slice(0, 5)
-      });
-      if (user.history.length > 50) user.history = user.history.slice(0, 50);
-
-      saveDB(db);
-      res.json({
-        ok: true,
-        win: isWin,
-        chance: parseFloat(chance.toFixed(2)),
-        balance: user.balance,
-        inventory: user.inventory,
-        history: user.history
-      });
-    });
-  } catch (e) {
-    console.error(e);
-    res.status(500).json({ error: 'Ошибка сервера' });
-  }
+app.post('/api/admin/list',(req,res)=>{
+try{
+const{adminUser,adminPass}=req.body;
+if(!ADMINS.includes(adminUser))return res.status(403).json({error:'Нет прав'});
+const db=loadDB();const admin=db.users[adminUser];
+if(!admin)return res.status(404).json({error:'Админ не найден'});
+bcrypt.compare(adminPass,admin.hash).then(ok=>{
+if(!ok)return res.status(403).json({error:'Неверный пароль'});
+const list=Object.keys(db.users).map(u=>({
+username:u,
+balance:db.users[u].balance||0,
+inventoryCount:(db.users[u].inventory||[]).length,
+luckMode:db.users[u].luckMode||'random'
+}));
+res.json({users:list});
+});
+}catch(e){res.status(500).json({error:'Ошибка'});}
 });
 
-// ---- API: покупка предмета ----
-app.post('/api/buy', (req, res) => {
-  try {
-    const { username, password, item } = req.body;
-    if (!username || !password || !item) return res.status(400).json({ error: 'Нет данных' });
-
-    const db = loadDB();
-    const user = db.users[username];
-    if (!user) return res.status(404).json({ error: 'Не найден' });
-
-    bcrypt.compare(password, user.hash).then(ok => {
-      if (!ok) return res.status(403).json({ error: 'Неверный пароль' });
-
-      if (user.balance < item.price) return res.status(400).json({ error: 'Недостаточно монет' });
-
-      user.balance -= item.price;
-      user.inventory.push({
-        ...item,
-        legit: true,
-        source: 'shop',
-        obtainedAt: Date.now(),
-        ticketId: generateTicketId()
-      });
-
-      saveDB(db);
-      res.json({ ok: true, balance: user.balance, inventory: user.inventory });
-    });
-  } catch (e) {
-    res.status(500).json({ error: 'Ошибка' });
-  }
-});
-
-// ---- API: админ — начислить/списать монеты ----
-app.post('/api/admin/grant', (req, res) => {
-  try {
-    const { adminUser, adminPass, targetUser, amount, admins } = req.body;
-
-    if (!admins.includes(adminUser)) return res.status(403).json({ error: 'Нет прав' });
-
-    const db = loadDB();
-    const admin = db.users[adminUser];
-    if (!admin) return res.status(404).json({ error: 'Админ не найден' });
-
-    bcrypt.compare(adminPass, admin.hash).then(ok => {
-      if (!ok) return res.status(403).json({ error: 'Неверный пароль админа' });
-
-      const target = db.users[targetUser];
-      if (!target) return res.status(404).json({ error: `Игрок "${targetUser}" не найден` });
-
-      const sum = Number(amount);
-      if (!sum || isNaN(sum)) return res.status(400).json({ error: 'Неверная сумма' });
-      if (target.balance + sum < 0) return res.status(400).json({ error: 'Баланс не может быть отрицательным' });
-
-      target.balance += sum;
-      if (sum > 0) {
-        if (!target.notifications) target.notifications = [];
-        target.notifications.push(`Администратор выдал вам ${sum} монет!`);
-      }
-
-      saveDB(db);
-      res.json({ ok: true, text: `${targetUser}: ${sum > 0 ? 'начислено' : 'списано'} ${Math.abs(sum)} монет` });
-    });
-  } catch (e) {
-    res.status(500).json({ error: 'Ошибка' });
-  }
-});
-
-// ---- API: список игроков (для админки) ----
-app.post('/api/admin/list', (req, res) => {
-  try {
-    const { adminUser, adminPass, admins } = req.body;
-    if (!admins.includes(adminUser)) return res.status(403).json({ error: 'Нет прав' });
-
-    const db = loadDB();
-    const admin = db.users[adminUser];
-    if (!admin) return res.status(404).json({ error: 'Админ не найден' });
-
-    bcrypt.compare(adminPass, admin.hash).then(ok => {
-      if (!ok) return res.status(403).json({ error: 'Неверный пароль' });
-      const list = Object.keys(db.users).map(u => ({
-        username: u,
-        balance: db.users[u].balance || 0,
-        inventoryCount: (db.users[u].inventory || []).length
-      }));
-      res.json({ users: list });
-    });
-  } catch (e) {
-    res.status(500).json({ error: 'Ошибка' });
-  }
-});
-
-// ---- Запуск ----
-app.listen(PORT, () => {
-  console.log(`FreeDon Upgrader сервер запущен на порту ${PORT}`);
-});
+app.listen(PORT,()=>{console.log(`FreeDon Upgrader сервер запущен на порту ${PORT}`);});
