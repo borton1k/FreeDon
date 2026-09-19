@@ -524,20 +524,68 @@ return (
 );
 };
 
-const CasesView=({balance,onOpen,opening,lastResult})=>{
+const CasesView=({balance,onOpen})=>{
 const cases=[
 {id:"hach",name:"Хач",price:4,emoji:"🥉",min:3,max:5},
 {id:"harosh",name:"Харош",price:10,emoji:"🥈",min:8,max:12},
 {id:"legenda",name:"Легенда",price:20,emoji:"🥇",min:15,max:25},
 {id:"sigma",name:"Сигма",price:40,emoji:"💎",min:35,max:50}
 ];
+const [spinning,setSpinning]=useState(false);
+const [ribbon,setRibbon]=useState([]);
+const [offset,setOffset]=useState(0);
+const [transition,setTransition]=useState(false);
+const [winItem,setWinItem]=useState(null);
+
+const ITEM_WIDTH=120;
+const RIBBON_LENGTH=50;
+const WIN_INDEX=42;
+
+const startSpin=async(c)=>{
+if(spinning||balance<c.price)return;
+const result=await onOpen(c);
+if(!result)return;
+const pool=ITEMS.filter(i=>i.price>=c.min&&i.price<=c.max);
+if(pool.length===0)return;
+const arr=[];
+for(let i=0;i<RIBBON_LENGTH;i++){
+if(i===WIN_INDEX){
+arr.push(result.item);
+}else{
+arr.push(pool[Math.floor(Math.random()*pool.length)]);
+}
+}
+setRibbon(arr);
+setOffset(0);
+setTransition(false);
+setWinItem(null);
+setSpinning(true);
+setTimeout(()=>{
+const vw=Math.min(window.innerWidth-80,700);
+const targetOffset=(WIN_INDEX*ITEM_WIDTH)-(vw/2)+(ITEM_WIDTH/2)+((Math.random()-0.5)*ITEM_WIDTH*0.5);
+setTransition(true);
+setOffset(targetOffset);
+},100);
+setTimeout(()=>{
+setWinItem(result.item);
+},4500);
+};
+
+const closeSpin=()=>{
+setSpinning(false);
+setRibbon([]);
+setOffset(0);
+setTransition(false);
+setWinItem(null);
+};
+
 return (
 <div className="glass rounded-3xl p-5">
 <div className="flex items-center gap-2 text-white font-bold mb-4"><Icon name="case" className="w-5 h-5 text-purple-400"/><span>Кейсы</span></div>
 <p className="text-xs text-gray-500 mb-4">Баланс: <span className="text-yellow-500 font-bold">{balance.toFixed(2)}</span></p>
 <div className="grid grid-cols-2 gap-3">
 {cases.map(c=>(
-<div key={c.id} className={`case-card ${balance<c.price||opening?'disabled':''}`} onClick={()=>{if(!opening&&balance>=c.price)onOpen(c);}}>
+<div key={c.id} className={`case-card ${balance<c.price||spinning?'disabled':''}`} onClick={()=>{if(!spinning&&balance>=c.price)startSpin(c);}}>
 <div className="text-5xl mb-2">{c.emoji}</div>
 <div className="text-white font-bold text-lg mb-1">{c.name}</div>
 <div className="text-gray-500 text-xs mb-2">Предметы: {c.min}–{c.max} монет</div>
@@ -545,25 +593,40 @@ return (
 </div>
 ))}
 </div>
-{opening&&(
-<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-fade-in">
-<div className="glass-strong rounded-3xl p-10 max-w-md w-full text-center shadow-2xl animate-slide-up">
-<div className="text-7xl mb-4 animate-case-open">🎁</div>
-<h3 className="text-white font-bold text-xl mb-4">Открываем кейс...</h3>
-<div className="spinner mx-auto"></div>
+
+{spinning&&(
+<div className="fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-[300] p-4 animate-fade-in">
+<div className="w-full max-w-3xl">
+<div className="text-center mb-6">
+<h3 className="text-white font-black text-2xl">🎁 Открываем кейс...</h3>
 </div>
+<div className="relative bg-gradient-to-b from-[#0d1220] to-[#070a12] rounded-2xl border border-white/10 overflow-hidden" style={{height:'180px'}}>
+<div className="absolute left-1/2 top-0 bottom-0 w-1 bg-red-500 z-20 -translate-x-1/2 shadow-[0_0_20px_rgba(239,68,68,0.8)]">
+<div className="absolute -top-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-r-[8px] border-t-[12px] border-l-transparent border-r-transparent border-t-red-500"></div>
+<div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-r-[8px] border-b-[12px] border-l-transparent border-r-transparent border-b-red-500"></div>
+</div>
+<div className="absolute top-0 bottom-0 flex items-center" style={{transform:`translateX(${-offset}px)`,transition:transition?'transform 4s cubic-bezier(0.15,0.85,0.25,1)':'none'}}>
+{ribbon.map((item,i)=>(
+<div key={i} className="shrink-0 flex items-center justify-center" style={{width:`${ITEM_WIDTH}px`,height:'180px'}}>
+<div className="w-24 h-32 flex flex-col items-center justify-center rounded-xl border-2 mx-2" style={{
+borderColor:item.color,
+background:`linear-gradient(160deg, ${item.color}22, ${item.color}08)`,
+boxShadow:winItem&&i===WIN_INDEX?`0 0 40px ${item.color}`:'none'
+}}>
+<div className="text-[10px] text-white font-bold text-center px-1 leading-tight mb-1">{item.name}</div>
+<div className="flex items-center gap-1 text-yellow-500 font-bold text-xs"><Icon name="coin" className="w-3 h-3"/>{item.price}</div>
+</div>
+</div>
+))}
+</div>
+</div>
+{winItem&&(
+<div className="text-center mt-6 animate-slide-up">
+<div className="text-gray-400 text-sm mb-2">Вы получили:</div>
+<div className="text-2xl font-black text-white mb-3">{winItem.name}</div>
+<button onClick={closeSpin} className="btn-success text-white font-bold py-3 px-8 rounded-xl">🎉 Забрать</button>
 </div>
 )}
-{lastResult&&!opening&&(
-<div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-fade-in">
-<div className="glass-strong rounded-3xl p-8 max-w-md w-full text-center shadow-2xl animate-slide-up">
-<div className="text-6xl mb-4">🎉</div>
-<div className="text-gray-400 text-sm mb-2">Вы получили:</div>
-<div className="text-2xl font-black text-white mb-4">{lastResult.item.name}</div>
-<div className="flex items-center justify-center gap-2 text-yellow-500 font-bold text-lg mb-6">
-<Icon name="coin" className="w-5 h-5"/>{lastResult.item.price}
-</div>
-<button onClick={lastResult.onClose} className="btn-primary w-full text-white font-bold py-3 rounded-xl">Забрать</button>
 </div>
 </div>
 )}
