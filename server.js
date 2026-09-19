@@ -134,13 +134,14 @@ const cooldown=24*60*60*1000;
 const elapsed=now-last;
 if(elapsed<cooldown){return res.status(400).json({error:'Бонус ещё недоступен',remaining:cooldown-elapsed});}
 const sectors=[3,5,7,9,12,5];
-const reward=sectors[Math.floor(Math.random()*sectors.length)];
+const idx=Math.floor(Math.random()*sectors.length);
+const reward=sectors[idx];
 user.balance+=reward;
 user.lastDailyBonus=now;
 if(!user.notifications)user.notifications=[];
 user.notifications.push(`Ежедневный бонус: +${reward} монет!`);
 saveDB(db);
-res.json({ok:true,reward,balance:user.balance,lastDailyBonus:user.lastDailyBonus});
+res.json({ok:true,reward,sectorIndex:idx,balance:user.balance,lastDailyBonus:user.lastDailyBonus});
 });
 }catch(e){console.error(e);res.status(500).json({error:'Ошибка сервера'});}
 });
