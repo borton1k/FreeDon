@@ -22,7 +22,7 @@ legenda:{id:"legenda",name:"Легенда",price:20,emoji:"🥇",type:"range",m
 sigma:{id:"sigma",name:"Сигма",price:40,emoji:"💎",type:"range",min:35,max:50,weights:[70,30]},
 allornothing:{id:"allornothing",name:"Всё или ничего",price:25,emoji:"💀",type:"fixed",items:[3,11],weights:[95,5]}
 };
-function loadDB(){try{const raw=fs.readFileSync(DB_FILE,'utf8');const d=JSON.parse(raw);if(!d.users)d.users={};if(!d.promocodes)d.promocodes={};return d;}catch(e){return{users:{},promocodes:{}};}}
+function loadDB(){try{const raw=fs.readFileSync(DB_FILE,'utf8');const d=JSON.parse(raw);if(!d.users)d.users={};if(!d.promocodes)d.promocodes={};if(!d.withdrawals)d.withdrawals={};return d;}catch(e){return{users:{},promocodes:{},withdrawals:{}};}}
 function saveDB(db){fs.writeFileSync(DB_FILE,JSON.stringify(db,null,2),'utf8');}
 function genTicket(){let id='';for(let i=0;i<8;i++)id+=Math.floor(Math.random()*10);return id;}
 function genPromo(){let c='FD';for(let i=0;i<6;i++)c+=Math.floor(Math.random()*10);return c;}
@@ -115,15 +115,6 @@ res.json({leaderboard:list.slice(0,20)});
 }catch(e){res.status(500).json({error:'Ошибка'});}
 });
 
-app.post('/api/cases/list',(req,res)=>{
-const list=Object.values(CASES).map(c=>({
-id:c.id,name:c.name,price:c.price,emoji:c.emoji,
-min:c.type==='range'?c.min:Math.min(...c.items.map(id=>ITEMS.find(i=>i.id===id).price)),
-max:c.type==='range'?c.max:Math.max(...c.items.map(id=>ITEMS.find(i=>i.id===id).price))
-}));
-res.json({cases:list});
-});
-
 app.post('/api/cases/open',(req,res)=>{
 try{
 const{username,password,caseId}=req.body;
@@ -135,9 +126,7 @@ if(!user)return res.status(404).json({error:'Не найден'});
 bcrypt.compare(password,user.hash).then(ok=>{
 if(!ok)return res.status(403).json({error:'Неверный пароль'});
 if(user.balance<c.price)return res.status(400).json({error:'Недостаточно монет'});
-
-let available;
-let weights;
+let available;let weights;
 if(c.type==='range'){
 available=ITEMS.filter(i=>i.price>=c.min&&i.price<=c.max).sort((a,b)=>a.price-b.price);
 weights=c.weights.slice(0,available.length);
@@ -145,7 +134,6 @@ weights=c.weights.slice(0,available.length);
 available=c.items.map(id=>ITEMS.find(i=>i.id===id)).sort((a,b)=>a.price-b.price);
 weights=c.weights.slice(0,available.length);
 }
-
 if(available.length===0)return res.status(400).json({error:'Нет предметов для этого кейса'});
 const totalW=weights.reduce((s,w)=>s+w,0);
 let roll=Math.random()*totalW;
@@ -154,7 +142,6 @@ for(let i=0;i<available.length;i++){
 roll-=weights[i];
 if(roll<=0){picked=available[i];break;}
 }
-
 user.balance-=c.price;
 const newItem={...picked,legit:true,source:'case',obtainedAt:Date.now(),ticketId:genTicket()};
 user.inventory.push(newItem);
@@ -164,6 +151,84 @@ saveDB(db);
 res.json({ok:true,item:newItem,balance:user.balance,inventory:user.inventory});
 });
 }catch(e){console.error(e);res.status(500).json({error:'Ошибка сервера'});}
+});
+
+app.post('/api/withdraw/request',(req,res)=>{
+try{
+const{username,password,ticketId}=req.body;
+if(!username||!password||!ticketId)return res.status(400).json({error:'Нет данных'});
+const db=loadDB();const user=db.users[username];
+if(!user)return res.status(404).json({error:'Не найден'});
+bcrypt.compare(password,user.hash).then(ok=>{
+if(!ok)return res.status(403).json({error:'Неверный пароль'});
+const idx=(user.inventory||[]).findIndex(i=>i.ticketId===ticketId);
+if(idx===-1)return res.status(400).json({error:'Предмет с таким ID не найден'});
+const item=user.inventory[idx];
+if(item.withdrawalPending)return res.status(400).json({error:'Этот предмет уже на выводе'});
+item.withdrawalPending=true;
+const withdrawal={
+ticketId,
+username,
+itemName:item.name,
+itemPrice:item.price,
+itemColor:item.color,
+source:item.source||"unknown",
+createdAt:Date.now(),
+status:"pending"
+};
+if(!db.withdrawals)db.withdrawals={};
+db.withdrawals[ticketId]=withdrawal;
+saveDB(db);
+res.json({ok:true,withdrawal});
+});
+}catch(e){res.status(500).json({error:'Ошибка'});}
+});
+
+app.post('/api/admin/withdrawals/list',(req,res)=>{
+try{
+const{adminUser,adminPass}=req.body;
+if(!ADMINS.includes(adminUser))return res.status(403).json({error:'Нет прав'});
+const db=loadDB();const admin=db.users[adminUser];
+if(!admin)return res.status(404).json({error:'Админ не найден'});
+bcrypt.compare(adminPass,admin.hash).then(ok=>{
+if(!ok)return res.status(403).json({error:'Неверный пароль'});
+const list=Object.values(db.withdrawals||{}).sort((a,b)=>b.createdAt-a.createdAt);
+res.json({withdrawals:list});
+});
+}catch(e){res.status(500).json({error:'Ошибка'});}
+});
+
+app.post('/api/admin/withdrawals/resolve',(req,res)=>{
+try{
+const{adminUser,adminPass,ticketId,action}=req.body;
+if(!ADMINS.includes(adminUser))return res.status(403).json({error:'Нет прав'});
+if(!['complete','reject'].includes(action))return res.status(400).json({error:'Неверное действие'});
+const db=loadDB();const admin=db.users[adminUser];
+if(!admin)return res.status(404).json({error:'Админ не найден'});
+bcrypt.compare(adminPass,admin.hash).then(ok=>{
+if(!ok)return res.status(403).json({error:'Неверный пароль'});
+const w=db.withdrawals[ticketId];
+if(!w)return res.status(404).json({error:'Заявка не найдена'});
+const target=db.users[w.username];
+if(action==='complete'){
+if(target&&target.inventory){
+const idx=target.inventory.findIndex(i=>i.ticketId===ticketId);
+if(idx!==-1)target.inventory.splice(idx,1);
+}
+delete db.withdrawals[ticketId];
+saveDB(db);
+return res.json({ok:true,text:`Заявка #${ticketId} выполнена, предмет выдан`});
+}else{
+if(target&&target.inventory){
+const it=target.inventory.find(i=>i.ticketId===ticketId);
+if(it)delete it.withdrawalPending;
+}
+delete db.withdrawals[ticketId];
+saveDB(db);
+return res.json({ok:true,text:`Заявка #${ticketId} отклонена, предмет разблокирован`});
+}
+});
+}catch(e){res.status(500).json({error:'Ошибка'});}
 });
 
 app.post('/api/upgrade',(req,res)=>{
@@ -179,6 +244,7 @@ const toItem=ITEMS.find(i=>i.id===toItemId);
 if(!fromItem||!toItem)return res.status(400).json({error:'Предмет не найден'});
 const idx=user.inventory.findIndex(i=>i.id===fromItemId);
 if(idx===-1)return res.status(400).json({error:'У вас нет этого предмета в инвентаре'});
+if(user.inventory[idx].withdrawalPending)return res.status(400).json({error:'Предмет на выводе — апгрейд невозможен'});
 let chance=(fromItem.price/toItem.price)*100;
 if(chance>90)chance=90;
 let isWin;
@@ -225,14 +291,8 @@ let code=genPromo();
 while(db.promocodes[code])code=genPromo();
 const lim=Math.max(1,Math.min(1000,parseInt(limit)||1));
 const promo={code,type,limit:lim,used:0,createdAt:Date.now(),expiresAt:Date.now()+14*24*60*60*1000,activations:{}};
-if(type==='money'){
-const amt=Math.max(1,Math.min(10000,parseInt(amount)||1));
-promo.amount=amt;
-}else{
-const cnt=Math.max(1,Math.min(10,parseInt(itemCount)||1));
-promo.itemId=parseInt(itemId);
-promo.itemCount=cnt;
-}
+if(type==='money'){promo.amount=Math.max(1,Math.min(10000,parseInt(amount)||1));}
+else{promo.itemId=parseInt(itemId);promo.itemCount=Math.max(1,Math.min(10,parseInt(itemCount)||1));}
 db.promocodes[code]=promo;
 saveDB(db);
 res.json({ok:true,code,promo});
@@ -289,10 +349,7 @@ bcrypt.compare(adminPass,admin.hash).then(ok=>{
 if(!ok)return res.status(403).json({error:'Неверный пароль'});
 const list=Object.values(db.promocodes).map(p=>{
 let itemName=null;
-if(p.type==='item'){
-const it=ITEMS.find(x=>x.id===p.itemId);
-itemName=it?it.name:'?';
-}
+if(p.type==='item'){const it=ITEMS.find(x=>x.id===p.itemId);itemName=it?it.name:'?';}
 return{code:p.code,type:p.type,amount:p.amount||null,itemName,itemCount:p.itemCount||null,used:p.used,limit:p.limit,expiresAt:p.expiresAt,createdAt:p.createdAt};
 });
 res.json({promocodes:list});
@@ -330,10 +387,7 @@ const sum=Number(amount);
 if(!sum||isNaN(sum))return res.status(400).json({error:'Неверная сумма'});
 if(target.balance+sum<0)return res.status(400).json({error:'Баланс не может быть отрицательным'});
 target.balance+=sum;
-if(sum>0){
-if(!target.notifications)target.notifications=[];
-target.notifications.push(`Администратор выдал вам ${sum} монет!`);
-}
+if(sum>0){if(!target.notifications)target.notifications=[];target.notifications.push(`Администратор выдал вам ${sum} монет!`);}
 saveDB(db);
 res.json({ok:true,text:`${targetUser}: ${sum>0?'начислено':'списано'} ${Math.abs(sum)} монет`});
 });
