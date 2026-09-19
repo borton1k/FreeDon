@@ -1,6 +1,7 @@
 const express=require('express');const cors=require('cors');const bcrypt=require('bcryptjs');const fs=require('fs');const path=require('path');
 const app=express();const PORT=process.env.PORT||3000;const DB_FILE=path.join(__dirname,'db.json');
 const ADMINS=["akaidzu"];
+const AVATARS=["🦊","🐺","🐯","🦁","🐸","🐲","🐉","🦅","🦉","🐙"];
 const ITEMS=[
 {id:1,name:"Тотем Бессмертия",price:3,color:"#9ca3af"},
 {id:2,name:"Сет Алмазной Брони З4",price:4,color:"#9ca3af"},
@@ -14,6 +15,12 @@ const ITEMS=[
 {id:10,name:"Ломтик Дыни",price:35,color:"#a855f7"},
 {id:11,name:"Талисман Sponsor",price:50,color:"#ef4444"}
 ];
+const CASES={
+hach:{id:"hach",name:"Хач",price:4,emoji:"🥉",min:3,max:5,weights:[50,30,20]},
+harosh:{id:"harosh",name:"Харош",price:10,emoji:"🥈",min:8,max:12,weights:[50,30,20]},
+legenda:{id:"legenda",name:"Легенда",price:20,emoji:"🥇",min:15,max:25,weights:[65,35]},
+sigma:{id:"sigma",name:"Сигма",price:40,emoji:"💎",min:35,max:50,weights:[70,30]}
+};
 function loadDB(){try{const raw=fs.readFileSync(DB_FILE,'utf8');const d=JSON.parse(raw);if(!d.users)d.users={};if(!d.promocodes)d.promocodes={};return d;}catch(e){return{users:{},promocodes:{}};}}
 function saveDB(db){fs.writeFileSync(DB_FILE,JSON.stringify(db,null,2),'utf8');}
 function genTicket(){let id='';for(let i=0;i<8;i++)id+=Math.floor(Math.random()*10);return id;}
@@ -30,7 +37,7 @@ if(password.length<4)return res.status(400).json({error:'Пароль миним
 const db=loadDB();
 if(db.users[username])return res.status(400).json({error:'Такой ник уже занят'});
 const hash=await bcrypt.hash(password,10);
-db.users[username]={hash,balance:0,inventory:[],history:[],notifications:[],lastDailyBonus:0,usedPromocodes:[],luckMode:"random",createdAt:Date.now()};
+db.users[username]={hash,balance:0,inventory:[],history:[],notifications:[],lastDailyBonus:0,usedPromocodes:[],luckMode:"random",avatar:"🦊",createdAt:Date.now()};
 saveDB(db);res.json({ok:true});
 }catch(e){console.error(e);res.status(500).json({error:'Ошибка сервера'});}
 });
@@ -43,7 +50,7 @@ const db=loadDB();const user=db.users[username];
 if(!user)return res.status(400).json({error:'Игрок не найден'});
 const ok=await bcrypt.compare(password,user.hash);
 if(!ok)return res.status(400).json({error:'Неверный пароль'});
-res.json({ok:true,user:{username,balance:user.balance,inventory:user.inventory,history:user.history,notifications:user.notifications||[],lastDailyBonus:user.lastDailyBonus||0,createdAt:user.createdAt}});
+res.json({ok:true,user:{username,balance:user.balance,inventory:user.inventory,history:user.history,notifications:user.notifications||[],lastDailyBonus:user.lastDailyBonus||0,avatar:user.avatar||"🦊",createdAt:user.createdAt}});
 }catch(e){res.status(500).json({error:'Ошибка сервера'});}
 });
 
@@ -54,7 +61,7 @@ const db=loadDB();const user=db.users[username];
 if(!user)return res.status(404).json({error:'Игрок не найден'});
 bcrypt.compare(password||'',user.hash).then(ok=>{
 if(!ok)return res.status(403).json({error:'Неверный пароль'});
-res.json({balance:user.balance,inventory:user.inventory,history:user.history,notifications:user.notifications||[],lastDailyBonus:user.lastDailyBonus||0,createdAt:user.createdAt});
+res.json({balance:user.balance,inventory:user.inventory,history:user.history,notifications:user.notifications||[],lastDailyBonus:user.lastDailyBonus||0,avatar:user.avatar||"🦊",createdAt:user.createdAt});
 });
 }catch(e){res.status(500).json({error:'Ошибка'});}
 });
@@ -72,6 +79,76 @@ saveDB(db);
 res.json({notifications:notes});
 });
 }catch(e){res.status(500).json({error:'Ошибка'});}
+});
+
+app.post('/api/avatar/set',(req,res)=>{
+try{
+const{username,password,avatar}=req.body;
+if(!username||!password||!avatar)return res.status(400).json({error:'Нет данных'});
+if(!AVATARS.includes(avatar))return res.status(400).json({error:'Недопустимая аватарка'});
+const db=loadDB();const user=db.users[username];
+if(!user)return res.status(404).json({error:'Не найден'});
+bcrypt.compare(password,user.hash).then(ok=>{
+if(!ok)return res.status(403).json({error:'Неверный пароль'});
+user.avatar=avatar;
+saveDB(db);
+res.json({ok:true,avatar});
+});
+}catch(e){res.status(500).json({error:'Ошибка'});}
+});
+
+app.post('/api/leaderboard',(req,res)=>{
+try{
+const db=loadDB();
+const list=Object.keys(db.users).map(u=>{
+const usr=db.users[u];
+const inv=usr.inventory||[];
+const invValue=inv.reduce((s,i)=>s+(i.price||0),0);
+const history=usr.history||[];
+const wins=history.filter(h=>h.win).length;
+const score=(usr.balance||0)+invValue+wins*10;
+return{username:u,avatar:usr.avatar||"🦊",balance:usr.balance||0,inventoryValue:invValue,wins,score,inventoryCount:inv.length};
+});
+list.sort((a,b)=>b.score-a.score);
+res.json({leaderboard:list.slice(0,20)});
+}catch(e){res.status(500).json({error:'Ошибка'});}
+});
+
+app.post('/api/cases/list',(req,res)=>{
+const list=Object.values(CASES).map(c=>({id:c.id,name:c.name,price:c.price,emoji:c.emoji,min:c.min,max:c.max}));
+res.json({cases:list});
+});
+
+app.post('/api/cases/open',(req,res)=>{
+try{
+const{username,password,caseId}=req.body;
+if(!username||!password||!caseId)return res.status(400).json({error:'Нет данных'});
+const c=CASES[caseId];
+if(!c)return res.status(400).json({error:'Кейс не найден'});
+const db=loadDB();const user=db.users[username];
+if(!user)return res.status(404).json({error:'Не найден'});
+bcrypt.compare(password,user.hash).then(ok=>{
+if(!ok)return res.status(403).json({error:'Неверный пароль'});
+if(user.balance<c.price)return res.status(400).json({error:'Недостаточно монет'});
+const available=ITEMS.filter(i=>i.price>=c.min&&i.price<=c.max).sort((a,b)=>a.price-b.price);
+if(available.length===0)return res.status(400).json({error:'Нет предметов для этого кейса'});
+const weights=c.weights.slice(0,available.length);
+const totalW=weights.reduce((s,w)=>s+w,0);
+let roll=Math.random()*totalW;
+let picked=available[available.length-1];
+for(let i=0;i<available.length;i++){
+roll-=weights[i];
+if(roll<=0){picked=available[i];break;}
+}
+user.balance-=c.price;
+const newItem={...picked,legit:true,source:'case',obtainedAt:Date.now(),ticketId:genTicket()};
+user.inventory.push(newItem);
+if(!user.notifications)user.notifications=[];
+user.notifications.push(`Кейс "${c.name}": ${picked.name}!`);
+saveDB(db);
+res.json({ok:true,item:newItem,balance:user.balance,inventory:user.inventory});
+});
+}catch(e){console.error(e);res.status(500).json({error:'Ошибка сервера'});}
 });
 
 app.post('/api/upgrade',(req,res)=>{
@@ -118,32 +195,6 @@ saveDB(db);
 res.json({ok:true,balance:user.balance,inventory:user.inventory});
 });
 }catch(e){res.status(500).json({error:'Ошибка'});}
-});
-
-app.post('/api/daily-bonus',(req,res)=>{
-try{
-const{username,password}=req.body;
-if(!username||!password)return res.status(400).json({error:'Не авторизован'});
-const db=loadDB();const user=db.users[username];
-if(!user)return res.status(404).json({error:'Не найден'});
-bcrypt.compare(password,user.hash).then(ok=>{
-if(!ok)return res.status(403).json({error:'Неверный пароль'});
-const now=Date.now();
-const last=user.lastDailyBonus||0;
-const cooldown=24*60*60*1000;
-const elapsed=now-last;
-if(elapsed<cooldown){return res.status(400).json({error:'Бонус ещё недоступен',remaining:cooldown-elapsed});}
-const sectors=[3,5,7,9,12,5];
-const idx=Math.floor(Math.random()*sectors.length);
-const reward=sectors[idx];
-user.balance+=reward;
-user.lastDailyBonus=now;
-if(!user.notifications)user.notifications=[];
-user.notifications.push(`Ежедневный бонус: +${reward} монет!`);
-saveDB(db);
-res.json({ok:true,reward,sectorIndex:idx,balance:user.balance,lastDailyBonus:user.lastDailyBonus});
-});
-}catch(e){console.error(e);res.status(500).json({error:'Ошибка сервера'});}
 });
 
 app.post('/api/promo/create',(req,res)=>{
@@ -305,7 +356,8 @@ const list=Object.keys(db.users).map(u=>({
 username:u,
 balance:db.users[u].balance||0,
 inventoryCount:(db.users[u].inventory||[]).length,
-luckMode:db.users[u].luckMode||'random'
+luckMode:db.users[u].luckMode||'random',
+avatar:db.users[u].avatar||'🦊'
 }));
 res.json({users:list});
 });
