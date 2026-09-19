@@ -537,8 +537,8 @@ const [ribbon,setRibbon]=useState([]);
 const [offset,setOffset]=useState(0);
 const [transition,setTransition]=useState(false);
 const [winItem,setWinItem]=useState(null);
-
-const ITEM_WIDTH=124;
+const ribbonRef=React.useRef(null);
+const winRef=React.useRef(null);
 const RIBBON_LENGTH=50;
 const WIN_INDEX=42;
 
@@ -562,24 +562,27 @@ pool=pool.filter(Boolean);
 if(pool.length===0)return;
 const arr=[];
 for(let i=0;i<RIBBON_LENGTH;i++){
-if(i===WIN_INDEX){
-arr.push(result.item);
-}else{
-arr.push(pool[Math.floor(Math.random()*pool.length)]);
-}
+if(i===WIN_INDEX)arr.push(result.item);
+else arr.push(pool[Math.floor(Math.random()*pool.length)]);
 }
 setRibbon(arr);
 setOffset(0);
 setTransition(false);
 setWinItem(null);
 setSpinning(true);
+
 setTimeout(()=>{
-const vw=Math.min(window.innerWidth-80,700);
-const randomShift=(Math.random()-0.5)*ITEM_WIDTH*0.6;
-const targetOffset=(WIN_INDEX*ITEM_WIDTH)-(vw/2)+(ITEM_WIDTH/2)+randomShift;
+if(!ribbonRef.current||!winRef.current)return;
+const containerRect=ribbonRef.current.getBoundingClientRect();
+const winRect=winRef.current.getBoundingClientRect();
+const containerCenter=containerRect.left+containerRect.width/2;
+const winCenter=winRect.left+winRect.width/2;
+const shift=winCenter-containerCenter;
+const randomShift=(Math.random()-0.5)*winRect.width*0.4;
 setTransition(true);
-setOffset(targetOffset);
-},100);
+setOffset(shift+randomShift);
+},200);
+
 setTimeout(()=>{
 setWinItem(result.item);
 },4500);
@@ -614,14 +617,14 @@ return (
 <div className="text-center mb-6">
 <h3 className="text-white font-black text-2xl">{winItem?'✨ Результат':'🎁 Открываем кейс...'}</h3>
 </div>
-<div className="relative bg-gradient-to-b from-[#0d1220] to-[#070a12] rounded-2xl border border-white/10 overflow-hidden" style={{height:'180px'}}>
+<div ref={ribbonRef} className="relative bg-gradient-to-b from-[#0d1220] to-[#070a12] rounded-2xl border border-white/10 overflow-hidden" style={{height:'180px'}}>
 <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-red-500 z-20 -translate-x-1/2 shadow-[0_0_20px_rgba(239,68,68,0.8)]">
 <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-r-[8px] border-t-[12px] border-l-transparent border-r-transparent border-t-red-500"></div>
 <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[8px] border-r-[8px] border-b-[12px] border-l-transparent border-r-transparent border-b-red-500"></div>
 </div>
 <div className="absolute top-0 bottom-0 flex items-center" style={{transform:`translateX(${-offset}px)`,transition:transition?'transform 4s cubic-bezier(0.15,0.85,0.25,1)':'none'}}>
 {ribbon.map((item,i)=>(
-<div key={i} className="shrink-0 flex items-center justify-center" style={{width:`${ITEM_WIDTH}px`,height:'180px',padding:'0 4px'}}>
+<div key={i} ref={i===WIN_INDEX?winRef:null} className="shrink-0 flex items-center justify-center" style={{width:'120px',height:'180px',padding:'0 6px'}}>
 <div className="w-full h-32 flex flex-col items-center justify-center rounded-xl border-2" style={{
 borderColor:item.color,
 background:`linear-gradient(160deg, ${item.color}22, ${item.color}08)`,
