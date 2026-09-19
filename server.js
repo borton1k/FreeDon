@@ -1,6 +1,19 @@
 const express=require('express');const cors=require('cors');const bcrypt=require('bcryptjs');const fs=require('fs');const path=require('path');
 const app=express();const PORT=process.env.PORT||3000;const DB_FILE=path.join(__dirname,'db.json');
 const ADMINS=["akaidzu"];
+const ITEMS=[
+{id:1,name:"Тотем Бессмертия",price:3,color:"#9ca3af"},
+{id:2,name:"Сет Алмазной Брони З4",price:4,color:"#9ca3af"},
+{id:3,name:"Зелье Черепашей Мощи",price:5,color:"#9ca3af"},
+{id:4,name:"Зачарованное Золотое Яблоко",price:8,color:"#22c55e"},
+{id:5,name:"Шар Порядка",price:10,color:"#22c55e"},
+{id:6,name:"Алый Лотос",price:12,color:"#22c55e"},
+{id:7,name:"Шар Дыни (на урон)",price:15,color:"#3b82f6"},
+{id:8,name:"Зимнее Зелье",price:20,color:"#3b82f6"},
+{id:9,name:"Слово Дыни, Сок На Асфальте",price:25,color:"#a855f7"},
+{id:10,name:"Ломтик Дыни",price:35,color:"#a855f7"},
+{id:11,name:"Талисман Sponsor",price:50,color:"#ef4444"}
+];
 function loadDB(){try{const raw=fs.readFileSync(DB_FILE,'utf8');const d=JSON.parse(raw);if(!d.users)d.users={};if(!d.promocodes)d.promocodes={};return d;}catch(e){return{users:{},promocodes:{}};}}
 function saveDB(db){fs.writeFileSync(DB_FILE,JSON.stringify(db,null,2),'utf8');}
 function genTicket(){let id='';for(let i=0;i<8;i++)id+=Math.floor(Math.random()*10);return id;}
@@ -63,14 +76,14 @@ res.json({notifications:notes});
 
 app.post('/api/upgrade',(req,res)=>{
 try{
-const{username,password,fromItemId,toItemId,items}=req.body;
+const{username,password,fromItemId,toItemId}=req.body;
 if(!username||!password)return res.status(400).json({error:'Не авторизован'});
 const db=loadDB();const user=db.users[username];
 if(!user)return res.status(404).json({error:'Не найден'});
 bcrypt.compare(password,user.hash).then(ok=>{
 if(!ok)return res.status(403).json({error:'Неверный пароль'});
-const fromItem=items.find(i=>i.id===fromItemId);
-const toItem=items.find(i=>i.id===toItemId);
+const fromItem=ITEMS.find(i=>i.id===fromItemId);
+const toItem=ITEMS.find(i=>i.id===toItemId);
 if(!fromItem||!toItem)return res.status(400).json({error:'Предмет не найден'});
 const idx=user.inventory.findIndex(i=>i.id===fromItemId);
 if(idx===-1)return res.status(400).json({error:'У вас нет этого предмета в инвентаре'});
