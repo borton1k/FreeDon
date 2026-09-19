@@ -155,8 +155,10 @@ res.json({ok:true,item:newItem,balance:user.balance,inventory:user.inventory});
 
 app.post('/api/withdraw/request',(req,res)=>{
 try{
-const{username,password,ticketId}=req.body;
+const{username,password,ticketId,mcNick}=req.body;
 if(!username||!password||!ticketId)return res.status(400).json({error:'Нет данных'});
+if(!mcNick||!mcNick.trim())return res.status(400).json({error:'Укажите ник в Minecraft'});
+if(mcNick.trim().length>32)return res.status(400).json({error:'Ник в MC слишком длинный'});
 const db=loadDB();const user=db.users[username];
 if(!user)return res.status(404).json({error:'Не найден'});
 bcrypt.compare(password,user.hash).then(ok=>{
@@ -169,6 +171,7 @@ item.withdrawalPending=true;
 const withdrawal={
 ticketId,
 username,
+mcNick:mcNick.trim(),
 itemName:item.name,
 itemPrice:item.price,
 itemColor:item.color,
@@ -217,7 +220,7 @@ if(idx!==-1)target.inventory.splice(idx,1);
 }
 delete db.withdrawals[ticketId];
 saveDB(db);
-return res.json({ok:true,text:`Заявка #${ticketId} выполнена, предмет выдан`});
+return res.json({ok:true,text:`Заявка #${ticketId} выполнена, предмет выдан игроку ${w.mcNick}`});
 }else{
 if(target&&target.inventory){
 const it=target.inventory.find(i=>i.ticketId===ticketId);
