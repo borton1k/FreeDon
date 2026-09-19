@@ -1,20 +1,4 @@
 {
-  "users": {
-    "akaidzu": {
-      "hash": "$2a$10$b6AExS5ZkUb5qQ8vY7OYiePN6OBNGDFAOYDr.H.g7wfwOUGjEmyDG",
-      "balance": 0,
-      "inventory": [],
-      "history": [],
-      "notifications": [],
-      "createdAt": 1789742945368
-    },
-    "test": {
-      "hash": "$2a$10$hZGObvKMS3ffOoHuAD4dBOLEh.VgRbVxkwxNam/jd0XmlDDTmEJlu",
-      "balance": 0,
-      "inventory": [],
-      "history": [],
-      "notifications": [],
-      "createdAt": 1789742982552
-    }
-  }
+  "users": {},
+  "promocodes": {}
 }
