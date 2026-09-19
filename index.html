@@ -1011,7 +1011,7 @@ onClick={()=>{if(!selectedItem)setSelectedItem(item);else if(selectedItem.id===i
 )}
 
 {activeTab==="cases"&&(
-<CasesView balance={balance} onOpen={handleOpenCase} opening={caseOpening} lastResult={caseResult}/>
+<CasesView balance={balance} onOpen={handleOpenCase}/>
 )}
 
 {activeTab==="leaderboard"&&(
